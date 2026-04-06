@@ -1,52 +1,45 @@
 # CLOco — Claude + Codex Collaboration
 
-A thin Claude Code plugin that orchestrates [SuperPowers](https://github.com/obra/superpowers) and [Codex](https://github.com/openai/codex-plugin-cc) into a unified development pipeline.
+A Claude Code plugin that adds Codex reviews to the [SuperPowers](https://github.com/obra/superpowers) workflow.
 
-**CLOco does not reimplement anything.** It chains existing skills and adds Codex review phases + interactive decision points between them.
+CLOco does not replace SuperPowers. It wraps it: same brainstorming, same plans, same execution, same verification — but between each phase, Codex independently reviews the output against your real codebase, and Claude rewrites the artifact based on the findings and your feedback.
 
-## What It Does
+## The Flow
 
+**Without CLOco** (SuperPowers alone):
 ```
-You describe what you want
-       │
-       ▼
-① superpowers:brainstorming ──► Spec
-       │
-       ▼
-② Codex reviews the spec ──► Findings
-       │
-       ▼
-   [You decide: A/B/C/D/E]
-       │
-       ▼
-③ superpowers:writing-plans ──► Plan
-       │
-       ▼
-④ Codex reviews the plan ──► Findings
-       │
-       ▼
-   [You decide: A/B/C/D/E]
-       │
-       ▼
-⑤ superpowers:subagent-driven-development ──► Code
-       │
-       ▼
-⑥ Codex reviews the implementation ──► Findings
-       │
-       ▼
-   [You decide: A/B/C/D/E]
-       │
-       ▼
-⑦ superpowers:verification-before-completion
+You describe → Claude brainstorms → spec → Claude writes plan → Claude executes → verify
 ```
 
-At every decision point, you get intelligent options — not just yes/no:
-- **A.** Integrate all findings
-- **B.** Cherry-pick specific findings
-- **C.** Ignore and continue
-- **D.** Ask Codex to dig deeper on a specific point
-- **E.** Take over yourself
-- Or free-form comment
+**With CLOco** (SuperPowers + Codex):
+```
+You describe → Claude brainstorms → spec
+                                      ↓
+                              Codex reviews spec (2-10 min, reads 30-80+ files)
+                              Codex writes findings to a file
+                                      ↓
+                              Claude shows you the findings
+                              You react however you want:
+                                "integre tout"
+                                "ignore le point 2, il a tort"
+                                "ajoute aussi le support de X"
+                                "le point 3 est interessant, creuse"
+                                ... ou n'importe quoi d'autre
+                                      ↓
+                              Claude reecrit la spec en tenant compte
+                                      ↓
+                              Claude writes plan (superpowers:writing-plans)
+                                      ↓
+                              Codex reviews plan → findings → you react → Claude rewrites
+                                      ↓
+                              Claude executes (superpowers:subagent-driven-development)
+                                      ↓
+                              Codex reviews the code → findings → you react → Claude fixes
+                                      ↓
+                              Verify (superpowers:verification-before-completion)
+```
+
+The interaction at each review point is exactly like SuperPowers normally — Claude presents findings, suggests options, you respond in natural language. The A/B/C/D/E options are suggestions, not a rigid menu.
 
 ## Prerequisites
 
@@ -72,13 +65,16 @@ Add to `~/.claude/settings.json`:
 }
 ```
 
-Restart Claude Code. SuperPowers provides brainstorming, plan writing, subagent execution, and verification.
+Restart Claude Code.
 
 ### Codex (optional but recommended)
 
-1. Install the CLI: `npm install -g @openai/codex`
-2. Authenticate: `codex login`
-3. Add to `~/.claude/settings.json`:
+```bash
+npm install -g @openai/codex
+codex login
+```
+
+Then add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -96,7 +92,7 @@ Restart Claude Code. SuperPowers provides brainstorming, plan writing, subagent 
 }
 ```
 
-Without Codex, CLOco runs in Claude-only mode — review phases are skipped with a warning.
+Without Codex, CLOco runs in Claude-only mode — review phases are skipped.
 
 ## Install CLOco
 
@@ -122,33 +118,34 @@ Restart Claude Code.
 /pipeline
 ```
 
-Or just describe what you want to build — CLOco triggers automatically.
+Or just describe what you want to build.
+
+## What Codex Actually Does
+
+Codex (GPT-5.4) is invoked as an independent reviewer. It:
+- Reads the spec/plan/code that Claude produced
+- Explores your codebase freely (30-80+ files, 2-10 minutes)
+- Writes its findings to a markdown file in the session directory
+- Has zero coordination with Claude — it reviews independently
+
+Claude then reads the findings file verbatim (no filtering, no summarizing) and presents them to you. You decide what to do. Claude rewrites the artifact accordingly.
+
+This is the same loop you already do manually when you open Codex in a separate terminal and paste findings back to Claude — CLOco just automates the file exchange.
 
 ## Session Files
 
-All artifacts are tracked in `docs/cloco-sessions/YYYY-MM-DD-<slug>/`:
-
-| File | Source | Content |
-|------|--------|---------|
-| `01-spec.md` | superpowers:brainstorming | Design spec |
-| `02-codex-review-spec.md` | Codex | Independent spec review |
-| `03-spec-v2.md` | Claude | Corrected spec (if findings integrated) |
-| `04-plan.md` | superpowers:writing-plans | Implementation plan |
-| `05-codex-review-plan.md` | Codex | Independent plan review |
-| `06-plan-v2.md` | Claude | Corrected plan (if findings integrated) |
-| `07-codex-review-impl.md` | Codex | Code review after implementation |
-| `session.log` | CLOco | All decisions, timestamps, job-ids |
-| `pipeline.config.md` | User | Optional verification config |
-
-Sessions are designed to be committed to git.
-
-## How Codex Reviews Work
-
-Codex (GPT-5.4) is invoked via the `codex-companion.mjs` script from the Codex plugin. It runs in **foreground** mode — Claude waits for the result (2-10 minutes is normal).
-
-Codex has full freedom to explore your codebase: reading 30-80+ files, running type checks, checking git history. Its findings are written to a markdown file and presented to you **raw, without filtering**.
-
-Claude and Codex communicate exclusively via files in the session directory.
+```
+docs/cloco-sessions/YYYY-MM-DD-<slug>/
+├── 01-spec.md                  ← Claude (via superpowers:brainstorming)
+├── 02-codex-review-spec.md     ← Codex findings
+├── 03-spec-v2.md               ← Claude rewrites after your feedback
+├── 04-plan.md                  ← Claude (via superpowers:writing-plans)
+├── 05-codex-review-plan.md     ← Codex findings
+├── 06-plan-v2.md               ← Claude rewrites after your feedback
+├── 07-codex-review-impl.md     ← Codex reviews the actual code
+├── session.log                 ← Decisions + timestamps
+└── pipeline.config.md          ← Optional verification config
+```
 
 ## License
 
