@@ -20,6 +20,15 @@ if [ -z "$PROJECT_DIR" ]; then
   exit 0
 fi
 
+# ── Kill switch: .cloclo-disabled ──────────────────────────────────
+# If the file exists, CLoClo is paused. Only inject a short notice.
+if [ -f "$PROJECT_DIR/.cloclo-disabled" ]; then
+  MSG="CLoClo is paused. To re-enable: delete .cloclo-disabled or say \"cloclo on\"."
+  MSG_ESCAPED=$(echo "$MSG" | python3 -c "import sys,json; print(json.dumps(sys.stdin.read().strip()))" 2>/dev/null || echo '"CLoClo paused."')
+  printf '{"hookSpecificOutput":{"hookEventName":"SessionStart","additionalContext":%s}}\n' "$MSG_ESCAPED"
+  exit 0
+fi
+
 CONTEXT=""
 
 # ── Section 1: Wiki State ──────────────────────────────────────────

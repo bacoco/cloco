@@ -129,6 +129,21 @@ Every session after that:
 
 The loop: **build → review → verify → learn → build better next time.**
 
+## Pause / Resume
+
+Sometimes you just want plain Claude Code without CLoClo's hooks. One command:
+
+```
+cloclo off        # creates .cloclo-disabled — all hooks go silent
+cloclo on         # removes .cloclo-disabled — CLoClo resumes
+```
+
+Or just tell Claude: "pause CLoClo" / "resume CLoClo". It creates or removes the file.
+
+When paused, the SessionStart hook injects a single line: *"CLoClo is paused."* Everything else is silent. Your wiki, skills, and session files stay untouched — nothing is lost.
+
+---
+
 ## Under the hood
 
 CLoClo has three skills that you can call explicitly if needed, but rarely should:

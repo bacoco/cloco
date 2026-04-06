@@ -8,6 +8,10 @@ set -o pipefail 2>/dev/null || true
 
 INPUT=$(cat)
 
+# Kill switch
+PROJECT_DIR_CHECK=$(echo "$INPUT" | python3 -c "import sys,json,os; print(json.load(sys.stdin).get('cwd',os.getcwd()))" 2>/dev/null || pwd)
+[ -f "$PROJECT_DIR_CHECK/.cloclo-disabled" ] && exit 0
+
 # Extract command
 COMMAND=$(echo "$INPUT" | python3 -c "
 import sys, json
