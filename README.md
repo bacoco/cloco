@@ -62,31 +62,15 @@ SuperPowers verifies    ──► done
 
 ## Installation
 
-Add these two entries to your `~/.claude/settings.json` and restart Claude Code:
+Tell Claude Code:
 
-```json
-{
-  "enabledPlugins": {
-    "cloco@cloco": true
-  },
-  "extraKnownMarketplaces": {
-    "cloco": {
-      "source": {
-        "source": "github",
-        "repo": "bacoco/cloco"
-      }
-    }
-  }
-}
+```
+Install the CLOco plugin from marketplace bacoco/cloco on GitHub
 ```
 
-That's it. Claude Code downloads CLOco from GitHub automatically.
+Claude will add the marketplace and plugin to your `settings.json` automatically. Restart Claude Code when prompted.
 
-On first run, `/pipeline` checks for SuperPowers and Codex. If either is missing, it installs them for you:
-
-- **SuperPowers missing:** CLOco adds it to your `settings.json` and tells you to restart.
-- **Codex CLI missing:** CLOco runs `npm install -g @openai/codex` and prompts `codex login`.
-- **Codex plugin missing:** CLOco adds it to your `settings.json` and tells you to restart.
+On first `/pipeline` run, CLOco checks for SuperPowers and Codex. If either is missing, it installs them automatically — adds the marketplace entries, installs the Codex CLI via npm, and prompts you to log in. No manual configuration needed.
 
 ## Usage
 
