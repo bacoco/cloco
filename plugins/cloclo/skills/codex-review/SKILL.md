@@ -68,7 +68,7 @@ If `codex whoami` fails, return status `CODEX_NOT_AUTHENTICATED` with the messag
    - `{{BASE_REF}}` -- git ref before implementation
    - `{{COMMIT_LIST}}` -- space-separated commit hashes
 3. Write the resolved prompt to a temp file:
-   `/tmp/cloco-codex-prompt-$(date +%s).md`
+   `/tmp/cloclo-codex-prompt-$(date +%s).md`
 
 Only placeholders present in the template are replaced. Missing placeholders for
 the given review type are an error in the template, not in the skill.
@@ -76,7 +76,7 @@ the given review type are an error in the template, not in the skill.
 ## 4. Execution (FOREGROUND)
 
 ```bash
-node "$CODEX_COMPANION_PATH" task --write --prompt-file /tmp/cloco-codex-prompt-{timestamp}.md
+node "$CODEX_COMPANION_PATH" task --write --prompt-file /tmp/cloclo-codex-prompt-{timestamp}.md
 ```
 
 - Print to the user: "Codex is reviewing... (this takes 2-10 minutes)"

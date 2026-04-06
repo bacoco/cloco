@@ -1,0 +1,9 @@
+{
+  "name": "cloclo",
+  "version": "0.1.0",
+  "description": "CLoClo — Code Loop Orchestrator: Claude + Codex. Inserts Codex reviews into the SuperPowers workflow.",
+  "author": {
+    "name": "Loic Baconnier"
+  },
+  "license": "MIT"
+}

@@ -1,10 +1,10 @@
-# CLOco — Claude + Codex Collaboration
+# CLoClo — Code Loop Orchestrator: Claude + Codex
 
 A Claude Code plugin that inserts [Codex](https://github.com/openai/codex-plugin-cc) reviews into the [SuperPowers](https://github.com/obra/superpowers) workflow.
 
-SuperPowers already does everything well: interactive brainstorming with a visual companion server, one-question-at-a-time UX exploration, spec writing, implementation plans with TDD, subagent execution, verification. CLOco does not touch any of that.
+SuperPowers already does everything well: interactive brainstorming with a visual companion server, one-question-at-a-time UX exploration, spec writing, implementation plans with TDD, subagent execution, verification. CLoClo does not touch any of that.
 
-What CLOco adds: after each SuperPowers phase produces an artifact (spec, plan, or code), Codex independently reviews it against your real codebase. The findings come back, you react naturally, and SuperPowers takes over again to integrate and continue.
+What CLoClo adds: after each SuperPowers phase produces an artifact (spec, plan, or code), Codex independently reviews it against your real codebase. The findings come back, you react naturally, and SuperPowers takes over again to integrate and continue.
 
 ## How It Works
 
@@ -22,7 +22,7 @@ Here is what happens:
 SuperPowers asks you questions one at a time. If it involves UI, it starts a local server with HTML mockups in your browser — you click to choose between options A, B, C. It proposes 2-3 approaches with trade-offs. You pick. It writes a spec, self-reviews it, shows it to you. You approve (or ask for changes).
 
 **Phase 2 — Codex reviews the spec.**
-CLOco sends the spec to Codex. Codex reads it, then freely explores your codebase (30-80+ files, 2-10 minutes). It checks that every file, function, and line mentioned in the spec actually exists. It writes its findings to a file.
+CLoClo sends the spec to Codex. Codex reads it, then freely explores your codebase (30-80+ files, 2-10 minutes). It checks that every file, function, and line mentioned in the spec actually exists. It writes its findings to a file.
 
 You see the findings and react however you want:
 - "integrate everything"
@@ -65,12 +65,12 @@ SuperPowers verifies    ──► done
 Tell Claude Code:
 
 ```
-Install the CLOco plugin from marketplace bacoco/cloco on GitHub
+Install the CLoClo plugin from marketplace bacoco/cloclo on GitHub
 ```
 
 Claude will add the marketplace and plugin to your `settings.json` automatically. Restart Claude Code when prompted.
 
-On first `/pipeline` run, CLOco checks for SuperPowers and Codex. If either is missing, it installs them automatically — adds the marketplace entries, installs the Codex CLI via npm, and prompts you to log in. No manual configuration needed.
+On first `/pipeline` run, CLoClo checks for SuperPowers and Codex. If either is missing, it installs them automatically — adds the marketplace entries, installs the Codex CLI via npm, and prompts you to log in. No manual configuration needed.
 
 ## Usage
 
@@ -85,15 +85,15 @@ Examples:
 /pipeline Build a CSV export feature for the reports page
 ```
 
-You can also just describe what you want without `/pipeline` — CLOco triggers automatically when it detects creative or implementation work.
+You can also just describe what you want without `/pipeline` — CLoClo triggers automatically when it detects creative or implementation work.
 
 ### Without Codex
 
-If Codex is not installed or not authenticated, CLOco skips the review phases. You get pure SuperPowers — still excellent, just without the independent Codex reviews between phases.
+If Codex is not installed or not authenticated, CLoClo skips the review phases. You get pure SuperPowers — still excellent, just without the independent Codex reviews between phases.
 
 ## Session Files
 
-All artifacts are tracked in `docs/cloco-sessions/YYYY-MM-DD-<slug>/`:
+All artifacts are tracked in `docs/cloclo-sessions/YYYY-MM-DD-<slug>/`:
 
 | File | Written by | Content |
 |------|-----------|---------|
@@ -104,7 +104,7 @@ All artifacts are tracked in `docs/cloco-sessions/YYYY-MM-DD-<slug>/`:
 | `05-codex-review-plan.md` | Codex | Findings on the plan |
 | `06-plan-v2.md` | SuperPowers | Rewritten plan after feedback |
 | `07-codex-review-impl.md` | Codex | Code review findings |
-| `session.log` | CLOco | Decisions, timestamps, job IDs |
+| `session.log` | CLoClo | Decisions, timestamps, job IDs |
 
 Sessions are designed to be committed to git for traceability.
 

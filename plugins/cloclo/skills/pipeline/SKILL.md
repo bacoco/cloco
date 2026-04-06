@@ -1,14 +1,14 @@
 ---
 name: pipeline
-description: "CLOco — Claude + Codex Collaboration pipeline. Orchestrates the full dev cycle by chaining SuperPowers skills (brainstorming, writing-plans, subagent-driven-development, verification-before-completion) with Codex reviews between phases. Triggers on: /pipeline, new feature, implement, build, create"
+description: "CLoClo — Claude + Codex Collaboration pipeline. Orchestrates the full dev cycle by chaining SuperPowers skills (brainstorming, writing-plans, subagent-driven-development, verification-before-completion) with Codex reviews between phases. Triggers on: /pipeline, new feature, implement, build, create"
 ---
 
-# CLOco Pipeline
+# CLoClo Pipeline
 
 Orchestrate the full development cycle by combining **existing skills** with
 Codex review phases and interactive decision points.
 
-**CLOco does NOT reimplement brainstorming, planning, execution, or verification.**
+**CLoClo does NOT reimplement brainstorming, planning, execution, or verification.**
 It invokes the real skills and adds Codex reviews + decision points between them.
 
 ## Prerequisites — Auto-Install
@@ -74,11 +74,11 @@ If Codex CLI, auth, or plugin fail but SuperPowers is available:
 ## Session Setup
 
 1. Ask the user what they want to build (or take their initial message).
-2. Create session directory: `docs/cloco-sessions/YYYY-MM-DD-<slug>/`
+2. Create session directory: `docs/cloclo-sessions/YYYY-MM-DD-<slug>/`
    - `<slug>` = 2-3 word kebab-case summary of the topic
 3. Initialize `session.log`:
    ```
-   [timestamp] CLOco session started: <slug>
+   [timestamp] CLoClo session started: <slug>
    [timestamp] Prerequisites: superpowers=OK, codex=OK|MISSING, auth=OK|MISSING
    ```
 4. If the project has specific verification needs, create `pipeline.config.md`
@@ -273,7 +273,7 @@ Log: `[timestamp] Phase 7 complete: {PASSED|FAILED}`
 ## Session File Structure
 
 ```
-docs/cloco-sessions/YYYY-MM-DD-<slug>/
+docs/cloclo-sessions/YYYY-MM-DD-<slug>/
 ├── 01-spec.md                  ← From superpowers:brainstorming
 ├── 02-codex-review-spec.md     ← From codex-review skill
 ├── 03-spec-v2.md               ← If corrections after review
@@ -288,7 +288,7 @@ docs/cloco-sessions/YYYY-MM-DD-<slug>/
 ## Session Log Format
 
 ```
-[2026-04-06T14:30:00] CLOco session started: auth-refactor
+[2026-04-06T14:30:00] CLoClo session started: auth-refactor
 [2026-04-06T14:30:01] Prerequisites: superpowers=OK, codex=OK, auth=OK
 [2026-04-06T14:45:00] Phase 1 complete: 01-spec.md
 [2026-04-06T14:45:30] User approved spec
@@ -317,4 +317,4 @@ docs/cloco-sessions/YYYY-MM-DD-<slug>/
 4. **If user types anything other than A-E:** treat as free-form comment and adapt.
 5. **Each phase outputs to session dir** with numbered filenames for traceability.
 6. **Session can be resumed.** Check session.log for last completed phase and continue from there.
-7. **SuperPowers specs and plans** are saved to their own directories (`docs/superpowers/specs/`, `docs/superpowers/plans/`). CLOco copies or symlinks them into the session dir for session tracking.
+7. **SuperPowers specs and plans** are saved to their own directories (`docs/superpowers/specs/`, `docs/superpowers/plans/`). CLoClo copies or symlinks them into the session dir for session tracking.
