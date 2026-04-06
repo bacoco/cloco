@@ -24,13 +24,14 @@ if ! echo "$COMMAND" | grep -qE 'git commit'; then
   exit 0
 fi
 
-# Check if wiki exists
+# Find project directory — try cwd from JSON input, then os.getcwd(), then pwd
 PROJECT_DIR=$(echo "$INPUT" | python3 -c "
 import sys, json, os
-print(os.getcwd())
+data = json.load(sys.stdin)
+print(data.get('cwd', os.getcwd()))
 " 2>/dev/null || pwd)
 
-# Try common project root indicators
+# Try project dir and git root
 for dir in "$PROJECT_DIR" "$(git -C "$PROJECT_DIR" rev-parse --show-toplevel 2>/dev/null)"; do
   if [ -f "$dir/wiki/schema.md" ] 2>/dev/null; then
     REMINDER="CLoClo: Commit detected. If this was a significant change, update relevant wiki pages (entities, concepts, decisions)."
