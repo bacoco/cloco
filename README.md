@@ -1,62 +1,110 @@
 # CLOco — Claude + Codex Collaboration
 
-A Claude Code plugin that orchestrates Claude and Codex as two developers collaborating via files.
+A thin Claude Code plugin that orchestrates [SuperPowers](https://github.com/obra/superpowers) and [Codex](https://github.com/openai/codex-plugin-cc) into a unified development pipeline.
+
+**CLOco does not reimplement anything.** It chains existing skills and adds Codex review phases + interactive decision points between them.
 
 ## What It Does
 
-CLOco automates the full development cycle:
-
-1. **Design** -- Interactive brainstorming with visual mockups in the browser
-2. **Spec** -- Claude writes a design spec, self-reviews it
-3. **Review** -- Codex independently reviews the spec against your actual codebase
-4. **Plan** -- Claude writes a task-by-task implementation plan
-5. **Review** -- Codex reviews the plan against real code
-6. **Execute** -- Claude implements via isolated subagents with two-stage review
-7. **Review** -- Codex reviews the actual code changes
-8. **Verify** -- Configurable verification (tests, browser, deploy)
-
-At every review stage, you get intelligent decision points (not just yes/no) -- integrate all findings, cherry-pick some, ask for deeper investigation, or take over yourself.
-
-## How It Works
-
-Claude and Codex communicate via markdown files in a session directory:
-
 ```
-docs/cloco-sessions/YYYY-MM-DD-<slug>/
-  00-brainstorm.html        # Interactive design exploration
-  01-spec.md                # Design specification
-  02-spec-review.md         # Codex review of the spec
-  03-spec-decision.md       # Your decision on spec review findings
-  04-plan.md                # Task-by-task implementation plan
-  05-plan-review.md         # Codex review of the plan
-  06-plan-decision.md       # Your decision on plan review findings
-  07-code-review.md         # Codex review of the implementation
-  08-code-decision.md       # Your decision on code review findings
-  09-verification.md        # Test and verification results
-  pipeline.config.md        # Session-specific verification config
+You describe what you want
+       │
+       ▼
+① superpowers:brainstorming ──► Spec
+       │
+       ▼
+② Codex reviews the spec ──► Findings
+       │
+       ▼
+   [You decide: A/B/C/D/E]
+       │
+       ▼
+③ superpowers:writing-plans ──► Plan
+       │
+       ▼
+④ Codex reviews the plan ──► Findings
+       │
+       ▼
+   [You decide: A/B/C/D/E]
+       │
+       ▼
+⑤ superpowers:subagent-driven-development ──► Code
+       │
+       ▼
+⑥ Codex reviews the implementation ──► Findings
+       │
+       ▼
+   [You decide: A/B/C/D/E]
+       │
+       ▼
+⑦ superpowers:verification-before-completion
 ```
 
-Codex has full freedom to explore your codebase during reviews -- reading 30-80+ files is normal and expected. Reviews take 2-10 minutes. This is a feature, not a bug.
+At every decision point, you get intelligent options — not just yes/no:
+- **A.** Integrate all findings
+- **B.** Cherry-pick specific findings
+- **C.** Ignore and continue
+- **D.** Ask Codex to dig deeper on a specific point
+- **E.** Take over yourself
+- Or free-form comment
 
 ## Prerequisites
 
-| Requirement | Install |
-|---|---|
-| Claude Code | You're running it |
-| Codex CLI | `npm install -g @openai/codex` then `codex login` |
-| Codex Claude Code plugin | Install from the Claude Code plugin marketplace (openai-codex) |
+CLOco depends on two plugins. Install them first.
 
-CLOco works without Codex -- reviews are skipped with a warning, and you get Claude-only mode.
+### SuperPowers (required)
 
-## Installation
+Add to `~/.claude/settings.json`:
 
-### From GitHub
-
-```bash
-git clone https://github.com/anthropics/cloco.git ~/.claude/plugins/marketplaces/cloco
+```json
+{
+  "enabledPlugins": {
+    "superpowers@superpowers-marketplace": true
+  },
+  "extraKnownMarketplaces": {
+    "superpowers-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "obra/superpowers-marketplace"
+      }
+    }
+  }
+}
 ```
 
-Then add to `~/.claude/settings.json`:
+Restart Claude Code. SuperPowers provides brainstorming, plan writing, subagent execution, and verification.
+
+### Codex (optional but recommended)
+
+1. Install the CLI: `npm install -g @openai/codex`
+2. Authenticate: `codex login`
+3. Add to `~/.claude/settings.json`:
+
+```json
+{
+  "enabledPlugins": {
+    "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
+  }
+}
+```
+
+Without Codex, CLOco runs in Claude-only mode — review phases are skipped with a warning.
+
+## Install CLOco
+
+```bash
+git clone https://github.com/bacoco/cloco.git ~/.claude/plugins/marketplaces/cloco
+```
+
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -66,61 +114,42 @@ Then add to `~/.claude/settings.json`:
 }
 ```
 
-## Usage
+Restart Claude Code.
 
-Start a new session:
+## Usage
 
 ```
 /pipeline
 ```
 
-Or just describe what you want to build -- CLOco triggers automatically on creative/implementation work.
+Or just describe what you want to build — CLOco triggers automatically.
 
 ## Session Files
 
-All artifacts are saved to `docs/cloco-sessions/YYYY-MM-DD-<slug>/` in your project:
+All artifacts are tracked in `docs/cloco-sessions/YYYY-MM-DD-<slug>/`:
 
-| File | Content |
-|------|---------|
-| `00-brainstorm.html` | Interactive design exploration with visual mockups |
-| `01-spec.md` | Design specification (problem, scope, decisions, files) |
-| `02-spec-review.md` | Codex review of the spec against your codebase |
-| `03-spec-decision.md` | Decision point: integrate, cherry-pick, investigate, or override |
-| `04-plan.md` | Task-by-task implementation plan with verification steps |
-| `05-plan-review.md` | Codex review of the plan against real code |
-| `06-plan-decision.md` | Decision point on plan review findings |
-| `07-code-review.md` | Codex review of the actual implementation |
-| `08-code-decision.md` | Decision point on code review findings |
-| `09-verification.md` | Test results and verification output |
-| `pipeline.config.md` | Verification commands and optional browser/deploy config |
+| File | Source | Content |
+|------|--------|---------|
+| `01-spec.md` | superpowers:brainstorming | Design spec |
+| `02-codex-review-spec.md` | Codex | Independent spec review |
+| `03-spec-v2.md` | Claude | Corrected spec (if findings integrated) |
+| `04-plan.md` | superpowers:writing-plans | Implementation plan |
+| `05-codex-review-plan.md` | Codex | Independent plan review |
+| `06-plan-v2.md` | Claude | Corrected plan (if findings integrated) |
+| `07-codex-review-impl.md` | Codex | Code review after implementation |
+| `session.log` | CLOco | All decisions, timestamps, job-ids |
+| `pipeline.config.md` | User | Optional verification config |
 
-Sessions are designed to be committed to git for traceability.
+Sessions are designed to be committed to git.
 
-## Configuration
+## How Codex Reviews Work
 
-Create `pipeline.config.md` in your session directory to configure verification:
+Codex (GPT-5.4) is invoked via the `codex-companion.mjs` script from the Codex plugin. It runs in **foreground** mode — Claude waits for the result (2-10 minutes is normal).
 
-```markdown
-# Pipeline Config
+Codex has full freedom to explore your codebase: reading 30-80+ files, running type checks, checking git history. Its findings are written to a markdown file and presented to you **raw, without filtering**.
 
-## Verification
-base_ref: main
-verification_commands:
-  - npm test
-  - npm run build
-
-## Browser Testing (optional)
-browser_base_url: http://localhost:3000
-screenshot_output_dir: public/screenshots/
-browser_tool: playwright
-
-## Deploy (optional)
-deploy_commands:
-  - docker compose up -d --build
-```
+Claude and Codex communicate exclusively via files in the session directory.
 
 ## License
 
 MIT
-
-Brainstorm server forked from [SuperPowers](https://github.com/obra/superpowers) (MIT).
