@@ -1,65 +1,124 @@
 # CLOco — Claude + Codex Collaboration
 
-Un plugin Claude Code qui insere des reviews Codex entre les phases de [SuperPowers](https://github.com/obra/superpowers).
+A Claude Code plugin that inserts [Codex](https://github.com/openai/codex-plugin-cc) reviews into the [SuperPowers](https://github.com/obra/superpowers) workflow.
 
-## Comment ca marche
+SuperPowers already does everything well: interactive brainstorming with a visual companion server, one-question-at-a-time UX exploration, spec writing, implementation plans with TDD, subagent execution, verification. CLOco does not touch any of that.
 
-SuperPowers fait deja tout tres bien : brainstorming interactif avec serveur UX, mockups dans le browser, questions une par une, ecriture de spec, ecriture de plan d'implementation, execution par subagents, verification. CLOco ne touche a rien de ca.
+What CLOco adds: after each SuperPowers phase produces an artifact (spec, plan, or code), Codex independently reviews it against your real codebase. The findings come back, you react naturally, and SuperPowers takes over again to integrate and continue.
 
-Ce que CLOco ajoute : quand SuperPowers produit un artefact (spec, plan, ou code), CLOco le passe a Codex (GPT-5.4) qui le review independamment en explorant le vrai codebase. Les findings reviennent, tu reagis comme tu veux, et SuperPowers reprend la main pour integrer et continuer.
+## How It Works
 
-### Le processus concret
+### Example session
 
-**1. Tu decris ce que tu veux faire.**
-
-**2. SuperPowers demarre son brainstorming.**
-Il te pose des questions une par une. Il demarre le serveur UX avec des mockups HTML dans le browser si c'est pertinent. Tu cliques tes choix, tu reponds, il explore le code existant. Il te propose 2-3 approches avec pros/cons. Tu choisis. Il ecrit la spec, la self-review, te la montre. Tu approuves.
-
-Tout ca, c'est SuperPowers. CLOco n'intervient pas.
-
-**3. CLOco envoie la spec a Codex.**
-Codex lit la spec. Puis il explore ton codebase librement — 30, 50, 80 fichiers. Il verifie que chaque affirmation de la spec correspond a la realite du code. Il ecrit ses findings dans un fichier. Ca prend 2-10 minutes. C'est normal.
-
-**4. Tu vois les findings de Codex et tu reagis.**
-Exactement comme avec SuperPowers normalement. C'est pas un menu rigide. Tu dis ce que tu veux :
-- "integre tout"
-- "le point 2 est faux parce que..."
-- "ignore ca, c'est pas pertinent"
-- "creuse le point sur les types"
-- ou n'importe quoi d'autre
-
-**5. SuperPowers reprend la main.**
-Il integre les findings de Codex et ton feedback. Il reecrit la spec. Puis il passe a l'ecriture du plan d'implementation (writing-plans) avec toute sa rigueur : TDD, tasks de 2-5 min, code complet, pas de placeholders.
-
-**6. CLOco envoie le plan a Codex.**
-Meme chose : Codex lit le plan, verifie que chaque fichier/fonction/ligne existe vraiment, identifie les risques. Findings dans un fichier. Tu reagis. SuperPowers reecrit le plan.
-
-**7. SuperPowers execute le plan.**
-Subagents frais par task, review spec compliance + code quality, gestion des blocages, model selection. Tout le moteur de superpowers:subagent-driven-development.
-
-**8. CLOco envoie le code a Codex.**
-Codex fait une vraie code review : git diff, lecture complete des fichiers modifies, verification des types, recherche de bugs. Findings. Tu reagis. SuperPowers corrige.
-
-**9. SuperPowers verifie.**
-verification-before-completion : pas de claims sans evidence, commandes de test executees, output affiche.
-
-### En resume
+You open Claude Code in your project and type:
 
 ```
-SuperPowers brainstorme ──► spec
-                              ↓ Codex review ↓ tu reagis ↓ SuperPowers reecrit
-SuperPowers ecrit le plan ──► plan
-                              ↓ Codex review ↓ tu reagis ↓ SuperPowers reecrit
-SuperPowers execute ──► code
-                              ↓ Codex review ↓ tu reagis ↓ SuperPowers corrige
-SuperPowers verifie ──► done
+/pipeline I want to add a search filter to the dashboard
 ```
 
-## Prerequis
+Here is what happens:
 
-### SuperPowers (obligatoire — fait tout le travail)
+**Phase 1 — SuperPowers brainstorms.**
+SuperPowers asks you questions one at a time. If it involves UI, it starts a local server with HTML mockups in your browser — you click to choose between options A, B, C. It proposes 2-3 approaches with trade-offs. You pick. It writes a spec, self-reviews it, shows it to you. You approve (or ask for changes).
 
-Ajouter dans `~/.claude/settings.json` :
+**Phase 2 — Codex reviews the spec.**
+CLOco sends the spec to Codex. Codex reads it, then freely explores your codebase (30-80+ files, 2-10 minutes). It checks that every file, function, and line mentioned in the spec actually exists. It writes its findings to a file.
+
+You see the findings and react however you want:
+- "integrate everything"
+- "point 2 is wrong because..."
+- "ignore that, not relevant"
+- "dig deeper into the type issue"
+- or anything else
+
+SuperPowers takes the findings and your feedback, rewrites the spec, and moves on.
+
+**Phase 3 — SuperPowers writes the implementation plan.**
+Full SuperPowers writing-plans: scope check, file structure table, bite-sized tasks (2-5 min each), TDD cycle, complete code blocks, pre-written commit messages.
+
+**Phase 4 — Codex reviews the plan.**
+Same as Phase 2. Codex verifies every file/line/function exists, checks task ordering, flags risks. You react. SuperPowers rewrites the plan.
+
+**Phase 5 — SuperPowers executes.**
+Full superpowers:subagent-driven-development: fresh subagent per task, two-stage review (spec compliance + code quality), status handling, model selection, red flags.
+
+**Phase 6 — Codex reviews the code.**
+Codex does a real code review: git diff, full file reads, type checks, bug hunting. You react. SuperPowers fixes.
+
+**Phase 7 — SuperPowers verifies.**
+Full verification-before-completion: no claims without evidence, commands executed, output shown.
+
+### Summary
+
+```
+SuperPowers brainstorms ──► spec
+                              ↓ Codex reviews ↓ you react ↓ SuperPowers rewrites
+SuperPowers writes plan ──► plan
+                              ↓ Codex reviews ↓ you react ↓ SuperPowers rewrites
+SuperPowers executes    ──► code
+                              ↓ Codex reviews ↓ you react ↓ SuperPowers fixes
+SuperPowers verifies    ──► done
+```
+
+## Installation
+
+### One command
+
+```bash
+git clone https://github.com/bacoco/cloco.git ~/.claude/plugins/marketplaces/cloco
+```
+
+Then restart Claude Code. On first run, `/pipeline` checks for SuperPowers and Codex. If either is missing, it installs them automatically:
+
+- **SuperPowers missing:** CLOco adds it to your `settings.json` and tells you to restart Claude Code.
+- **Codex CLI missing:** CLOco runs `npm install -g @openai/codex` and prompts `codex login`.
+- **Codex plugin missing:** CLOco adds it to your `settings.json` and tells you to restart.
+
+You can also install prerequisites manually — see [Manual Setup](#manual-setup).
+
+## Usage
+
+```
+/pipeline <describe what you want to build>
+```
+
+Examples:
+```
+/pipeline Add a search filter to the user dashboard
+/pipeline Refactor the auth middleware to support JWT rotation
+/pipeline Build a CSV export feature for the reports page
+```
+
+You can also just describe what you want without `/pipeline` — CLOco triggers automatically when it detects creative or implementation work.
+
+### Without Codex
+
+If Codex is not installed or not authenticated, CLOco skips the review phases. You get pure SuperPowers — still excellent, just without the independent Codex reviews between phases.
+
+## Session Files
+
+All artifacts are tracked in `docs/cloco-sessions/YYYY-MM-DD-<slug>/`:
+
+| File | Written by | Content |
+|------|-----------|---------|
+| `01-spec.md` | SuperPowers | Design specification |
+| `02-codex-review-spec.md` | Codex | Findings on the spec |
+| `03-spec-v2.md` | SuperPowers | Rewritten spec after feedback |
+| `04-plan.md` | SuperPowers | Implementation plan |
+| `05-codex-review-plan.md` | Codex | Findings on the plan |
+| `06-plan-v2.md` | SuperPowers | Rewritten plan after feedback |
+| `07-codex-review-impl.md` | Codex | Code review findings |
+| `session.log` | CLOco | Decisions, timestamps, job IDs |
+
+Sessions are designed to be committed to git for traceability.
+
+## Manual Setup
+
+If you prefer to install prerequisites manually:
+
+### SuperPowers
+
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -68,25 +127,20 @@ Ajouter dans `~/.claude/settings.json` :
   },
   "extraKnownMarketplaces": {
     "superpowers-marketplace": {
-      "source": {
-        "source": "github",
-        "repo": "obra/superpowers-marketplace"
-      }
+      "source": { "source": "github", "repo": "obra/superpowers-marketplace" }
     }
   }
 }
 ```
 
-Redemarrer Claude Code.
-
-### Codex (optionnel — le reviewer)
+### Codex
 
 ```bash
 npm install -g @openai/codex
 codex login
 ```
 
-Puis ajouter dans `~/.claude/settings.json` :
+Add to `~/.claude/settings.json`:
 
 ```json
 {
@@ -95,58 +149,12 @@ Puis ajouter dans `~/.claude/settings.json` :
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
-      "source": {
-        "source": "github",
-        "repo": "openai/codex-plugin-cc"
-      }
+      "source": { "source": "github", "repo": "openai/codex-plugin-cc" }
     }
   }
 }
 ```
 
-Sans Codex, c'est juste SuperPowers normal — les reviews sont sautees.
-
-## Installer CLOco
-
-```bash
-git clone https://github.com/bacoco/cloco.git ~/.claude/plugins/marketplaces/cloco
-```
-
-Ajouter dans `~/.claude/settings.json` :
-
-```json
-{
-  "enabledPlugins": {
-    "cloco@cloco": true
-  }
-}
-```
-
-Redemarrer Claude Code.
-
-## Utilisation
-
-```
-/pipeline
-```
-
-Ou simplement decrire ce que tu veux construire.
-
-## Fichiers de session
-
-Tous les artefacts sont traces dans `docs/cloco-sessions/YYYY-MM-DD-<slug>/` :
-
-```
-01-spec.md                  ← SuperPowers brainstorming
-02-codex-review-spec.md     ← Findings Codex sur la spec
-03-spec-v2.md               ← SuperPowers reecrit apres feedback
-04-plan.md                  ← SuperPowers writing-plans
-05-codex-review-plan.md     ← Findings Codex sur le plan
-06-plan-v2.md               ← SuperPowers reecrit apres feedback
-07-codex-review-impl.md     ← Findings Codex sur le code
-session.log                 ← Decisions + timestamps
-```
-
-## Licence
+## License
 
 MIT

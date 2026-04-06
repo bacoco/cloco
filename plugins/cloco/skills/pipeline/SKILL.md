@@ -11,26 +11,65 @@ Codex review phases and interactive decision points.
 **CLOco does NOT reimplement brainstorming, planning, execution, or verification.**
 It invokes the real skills and adds Codex reviews + decision points between them.
 
-## Prerequisites
+## Prerequisites — Auto-Install
 
-Check these at pipeline start. If a prerequisite is missing, show the install
-command and let the user decide whether to continue in degraded mode.
+At pipeline start, check and **automatically fix** missing dependencies.
 
-### Required
+### Step 1: Check SuperPowers
 
-| Prerequisite | Check | Install |
-|---|---|---|
-| SuperPowers plugin | Skill `superpowers:brainstorming` is available | Add `"superpowers@superpowers-marketplace": true` to `~/.claude/settings.json` and restart Claude Code. If the marketplace is not registered, add to `extraKnownMarketplaces`: `"superpowers-marketplace": {"source": {"source": "github", "repo": "obra/superpowers-marketplace"}}` |
-| Codex CLI | `codex --version` | `npm install -g @openai/codex` then `codex login` |
-| Codex Claude Code plugin | `find ~/.claude/plugins -name codex-companion.mjs -path '*/codex/scripts/*'` finds a file | Add `"codex@openai-codex": true` to `~/.claude/settings.json`. If the marketplace is not registered, add to `extraKnownMarketplaces`: `"openai-codex": {"source": {"source": "github", "repo": "openai/codex-plugin-cc"}}` |
+```bash
+# Try to invoke a SuperPowers skill to see if it's available
+```
 
-### Degraded Modes
+If SuperPowers is NOT available:
+1. Read `~/.claude/settings.json`
+2. Add `"superpowers@superpowers-marketplace": true` to `enabledPlugins`
+3. Add `"superpowers-marketplace": {"source": {"source": "github", "repo": "obra/superpowers-marketplace"}}` to `extraKnownMarketplaces` (if not already present)
+4. Write back `settings.json`
+5. Tell the user: "SuperPowers was not installed. I've added it to your settings. **Please restart Claude Code** and run `/pipeline` again."
+6. **STOP.** SuperPowers requires a restart to load.
 
-| Missing | Consequence |
-|---|---|
-| SuperPowers | **STOP.** Cannot proceed — brainstorming, planning, execution, and verification depend on it. |
-| Codex CLI or plugin | **WARNING.** Continue without Codex reviews. Phases 2, 4, and 6 are skipped. The user gets Claude-only mode. |
-| Codex not authenticated | **WARNING.** Same as above. Show: "Run `codex login` to enable Codex reviews." |
+### Step 2: Check Codex CLI
+
+```bash
+codex --version
+```
+
+If `codex` is NOT found:
+1. Run: `npm install -g @openai/codex`
+2. If npm fails, tell the user: "Could not install Codex CLI. Install it manually: `npm install -g @openai/codex`"
+3. After install, run: `codex --version` to confirm
+
+### Step 3: Check Codex authentication
+
+```bash
+codex whoami
+```
+
+If not authenticated:
+1. Tell the user: "Codex is not authenticated. Run `! codex login` (the `!` prefix runs it in this session)."
+2. Wait for the user to confirm login is done.
+
+### Step 4: Check Codex Claude Code plugin
+
+```bash
+find ~/.claude/plugins -name codex-companion.mjs -path '*/codex/scripts/*' 2>/dev/null | head -1
+```
+
+If companion NOT found:
+1. Read `~/.claude/settings.json`
+2. Add `"codex@openai-codex": true` to `enabledPlugins`
+3. Add `"openai-codex": {"source": {"source": "github", "repo": "openai/codex-plugin-cc"}}` to `extraKnownMarketplaces` (if not already present)
+4. Write back `settings.json`
+5. Tell the user: "Codex plugin was not installed. I've added it to your settings. **Please restart Claude Code** and run `/pipeline` again."
+6. **STOP.** Plugin requires a restart to load.
+
+### Degraded Mode
+
+If Codex CLI, auth, or plugin fail but SuperPowers is available:
+- **WARNING:** "Codex reviews will be skipped. Running in SuperPowers-only mode."
+- Continue without Codex reviews (phases 2, 4, 6 are skipped).
+- The pipeline still works — you just don't get the independent Codex reviews.
 
 ## Session Setup
 
