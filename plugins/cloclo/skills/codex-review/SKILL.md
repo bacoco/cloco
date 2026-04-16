@@ -1,14 +1,15 @@
 ---
 name: codex-review
-description: "Invoke Codex (GPT-5.4) to review a spec, plan, or implementation. Codex explores the codebase freely and writes findings to a file. Foreground execution — Claude waits for result."
+description: "Review a spec, plan, or implementation — first tries Codex (GPT-5.4), falls back to Claude subagent if unavailable. Writes findings to a file. Foreground execution."
 user-invocable: false
 ---
 
 # codex-review
 
-Invoke the Codex companion (GPT-5.4) to produce an independent review of a spec,
-plan, or implementation. Codex has full codebase access and writes its findings to
-a file that Claude reads back verbatim.
+Review a spec, plan, or implementation. Tries Codex first (independent model, explores
+codebase freely). If Codex is unavailable (CLI missing, usage limits, runtime error),
+falls back to a Claude subagent review. Either way, findings are written to a file
+that the calling skill reads back verbatim.
 
 ## 1. Context Reception
 
@@ -19,99 +20,141 @@ The calling skill (typically `pipeline`) passes:
 | `review_type` | all                   | One of `spec`, `plan`, `impl`                    |
 | `session_dir` | all                   | Absolute path to the session directory            |
 | `input_file`  | all                   | Path to the artifact under review                |
-| `output_file` | all                   | Path where Codex must write its review            |
+| `output_file` | all                   | Path where the review must be written             |
 | `spec_path`   | `plan`, `impl`        | Path to the approved spec                        |
 | `plan_path`   | `impl`                | Path to the approved plan                        |
 | `base_ref`    | `impl`                | Git ref before implementation started            |
 | `commit_list` | `impl`                | Space-separated commit hashes to review          |
 
-## 2. Prerequisites Check
+## 2. Try Codex First
 
-First, verify that the Codex CLI is installed:
-
-```bash
-# Check Codex CLI availability
-if ! command -v codex &>/dev/null; then
-  echo "Codex CLI not found. Install it with: npm install -g @openai/codex"
-  # return CODEX_UNAVAILABLE
-fi
-```
-
-Then, locate the companion script:
+### Prerequisites
 
 ```bash
-# Find companion
+# Check Codex CLI
+command -v codex &>/dev/null || CODEX_UNAVAILABLE=1
+
+# Find companion script
 CODEX_COMPANION_PATH="${CODEX_COMPANION_PATH:-$(find ~/.claude/plugins -name codex-companion.mjs -path '*/codex/scripts/*' 2>/dev/null | head -1)}"
+[ -z "$CODEX_COMPANION_PATH" ] && CODEX_UNAVAILABLE=1
 
-# If not found: return CODEX_UNAVAILABLE
 # Auth is managed by Codex CLI internally — do NOT check codex whoami or OPENAI_API_KEY
 ```
 
-If the Codex CLI is not installed, return status `CODEX_UNAVAILABLE` with the message:
-"Codex CLI not found. Install it with: `npm install -g @openai/codex`"
+### Prompt Construction
 
-If `CODEX_COMPANION_PATH` resolves to nothing, return status `CODEX_UNAVAILABLE` with
-the message: "Codex companion not found. Install the Codex plugin from the Claude Code marketplace."
+1. Read the template: `${SKILL_DIR}/templates/review-{review_type}-prompt.md`
+2. Replace placeholders: `{{SPEC_PATH}}`, `{{PLAN_PATH}}`, `{{OUTPUT_PATH}}`, `{{BASE_REF}}`, `{{COMMIT_LIST}}`
+3. Write resolved prompt to `/tmp/cloclo-codex-prompt-$(date +%s).md`
 
-If `codex whoami` fails, return status `CODEX_NOT_AUTHENTICATED` with the message:
-"Codex is not authenticated. Run `codex login` first."
-
-## 3. Prompt Construction
-
-1. Read the template matching the review type:
-   `${SKILL_DIR}/templates/review-{review_type}-prompt.md`
-2. Replace placeholders with actual values:
-   - `{{SPEC_PATH}}` -- path to the spec
-   - `{{PLAN_PATH}}` -- path to the plan
-   - `{{OUTPUT_PATH}}` -- path where Codex writes its review
-   - `{{BASE_REF}}` -- git ref before implementation
-   - `{{COMMIT_LIST}}` -- space-separated commit hashes
-3. Write the resolved prompt to a temp file:
-   `/tmp/cloclo-codex-prompt-$(date +%s).md`
-
-Only placeholders present in the template are replaced. Missing placeholders for
-the given review type are an error in the template, not in the skill.
-
-## 4. Execution (FOREGROUND)
+### Execution (FOREGROUND)
 
 ```bash
 node "$CODEX_COMPANION_PATH" task --write --prompt-file /tmp/cloclo-codex-prompt-{timestamp}.md
 ```
 
-- Print to the user: "Codex is reviewing... (this takes 2-10 minutes)"
-- Block until the Codex process exits
-- Delete the temp prompt file after completion regardless of exit code
+- Print: "Codex is reviewing... (this takes 2-10 minutes)"
+- Block until exit
+- Delete temp prompt after completion
 
-This is a **foreground** call. Claude does not proceed until Codex finishes.
-No background promises, no polling loops.
+### Result Check
 
-## 5. Result Handling
+If `output_file` exists and is non-empty → **Codex succeeded**. Return raw content.
 
-After Codex exits, check whether `output_file` exists and is non-empty.
+If Codex failed (exit code non-zero, output empty, usage limit error) → **fall through to Claude fallback** (section 3).
 
-**Success path:**
+Log to `session.log` either way.
+
+## 3. Claude Fallback
+
+When Codex is unavailable or fails, dispatch a Claude subagent to do the review.
+
+**Why this works:** The subagent has fresh context (hasn't seen the conversation), reads
+the actual files, and catches real bugs. Less independent than Codex (same model family),
+but far better than skipping the review.
+
+### Dispatch by review_type
+
+**For `spec` review:**
+
+```
+Agent(
+  subagent_type: "superpowers:code-reviewer",
+  prompt: "Review this implementation spec: {input_file}
+
+  You are a senior reviewer. Read the spec, explore the codebase, and verify:
+  - Every file, function, and hook mentioned actually exists
+  - The architecture is feasible
+  - Edge cases and fallbacks are defined
+  - No contradictions between sections
+
+  Write your review to: {output_file}
+
+  Format: Verdict, then findings with severity (P0/P1/P2), file refs, and line numbers."
+)
+```
+
+**For `plan` review:**
+
+```
+Agent(
+  subagent_type: "superpowers:code-reviewer",
+  prompt: "Review this implementation plan: {input_file}
+  Based on the spec: {spec_path}
+
+  You are a senior reviewer. Read the plan, explore the codebase, and verify:
+  - Every file/function/hook mentioned exists and has the right signature
+  - The plan covers everything the spec requires
+  - Task order has no circular dependencies
+  - Code snippets will compile against real types
+  - Edge cases from the spec have matching implementation steps
+
+  Write your review to: {output_file}
+
+  Format: Verdict, then findings with severity (P0/P1/P2), file refs, and line numbers."
+)
+```
+
+**For `impl` review:**
+
+```
+Agent(
+  subagent_type: "superpowers:code-reviewer",
+  prompt: "Review this implementation against its spec and plan.
+
+  Spec: {spec_path}
+  Plan: {plan_path}
+  Base ref: {base_ref}
+  Commits: {commit_list}
+
+  Run git diff {base_ref}..HEAD to see all changes. Read each modified file in full.
+  Verify:
+  - Implementation matches the spec
+  - Hook signatures, field names, and types are correct
+  - Fallbacks defined for empty/error states
+  - No regressions in modified files
+  - Mobile responsive if UI was touched
+
+  Write your review to: {output_file}
+
+  Format: Verdict, then findings with severity (P0/P1/P2), file refs, and line numbers."
+)
+```
+
+### Result Handling (same for both Codex and Claude)
+
 - Read `output_file` in its entirety
-- Return the raw content to the calling skill -- no summarization, no reformatting
-- Log to `${session_dir}/session.log`:
+- Return raw content to the calling skill — no summarization, no reformatting
+- Log to `session.log`:
   ```
-  [2026-04-06T14:32:01] Codex review (type=spec) started (job-id: abc123)
-  [2026-04-06T14:34:47] Codex review complete: /path/to/output_file
+  [timestamp] Review (type=spec, engine=codex|claude) complete: /path/to/output_file
   ```
 
-**Failure path:**
-- Return status `CODEX_REVIEW_FAILED` with whatever stderr or exit code Codex produced
-- Log the failure to `session.log` with the same format
-- Do NOT retry automatically
+## 4. Important Rules
 
-## 6. Important Rules
-
-- **NEVER summarize or filter Codex findings.** The calling skill receives the raw
-  file exactly as Codex wrote it. Post-processing destroys signal.
-- **NEVER re-run Codex automatically.** If the review is unsatisfactory, the user
-  decides whether to iterate. One invocation per skill call.
-- **If Codex fails, warn and return.** Do not block the pipeline. The calling skill
-  handles degraded mode (proceed without review or abort).
-- **Foreground ONLY.** No `run_in_background`, no `&`, no detached processes.
-  Claude waits, reads the result, and continues.
-- **Clean up temp files.** The resolved prompt in `/tmp/` is deleted after execution.
-  The output file in `session_dir/` is permanent.
+- **NEVER summarize or filter findings.** Raw file, as written by the reviewer.
+- **NEVER re-run automatically.** User decides via decision points A-E.
+- **NEVER skip reviews entirely.** If Codex fails, Claude reviews. If Claude fails, warn and return.
+- **Foreground ONLY.** No background promises, no polling loops.
+- **Clean up temp files.** Codex prompt in `/tmp/` is deleted. Output in `session_dir/` is permanent.
+- **Log which engine was used.** The calling skill and the user should know if the review came from Codex or Claude.
