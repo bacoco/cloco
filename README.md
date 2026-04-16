@@ -129,6 +129,33 @@ Every session after that:
 
 The loop: **build → review → verify → learn → build better next time.**
 
+## What's New (2026-04-16)
+
+17 techniques from a GitHub-wide scout of 8 repos, implemented across all skills:
+
+**Pipeline:**
+- **Maturity levels** (spike/dev/ship) — one field controls gate strictness, parallelism, review depth
+- **Task DAG** — dependency graph with wave-based parallel dispatch, file reservations per agent
+- **Checkpoint/resume** — crash mid-pipeline? Resume from last completed phase
+- **Session handoff** — auto-written handoff.md for multi-session continuity
+- **Bounded retries** — hard ceilings per phase (2-3 max), no infinite loops
+- **AC compliance report** — acceptance criteria mapped to covering tests
+- **Stakes-based approval matrix** — auto/confirm/explicit by risk level
+
+**Codex Review:**
+- **Adversarial triple-perspective** — Skeptic, Devil's Advocate, Edge-Case Hunter after every review
+- **Evidence tagging** — `[TOOL]`/`[CODE]`/`[LLM-JUDGMENT]` on every finding
+- **Convergence-gated critic loop** — iterative fix/re-review with PASS/FAIL/ESCALATE/DEFER verdicts
+- **Consensus matrix** — spread detection when multiple models review the same artifact
+
+**Wiki:**
+- **Graph-traversal queries** — 5 query types (factual/relational/analytical/gap/exploratory) with BFS walks
+- **Auto-synthesis pages** — cached cross-page inferences with derived-from backlinks
+- **PII heuristic** — blocks credentials/secrets from being written to wiki pages
+- **Log compaction** — weekly summaries for entries >7 days old
+
+**New skill: /rollback** — soft (uncommit, keep files) or hard (revert), safety checks, checkpoint update
+
 ## Pause / Resume
 
 Sometimes you just want plain Claude Code without CLoClo's hooks. One command:
@@ -146,13 +173,15 @@ When paused, the SessionStart hook injects a single line: *"CLoClo is paused."* 
 
 ## Under the hood
 
-CLoClo has three skills that you can call explicitly if needed, but rarely should:
+CLoClo has five skills that you can call explicitly if needed, but rarely should:
 
 | Skill | What | When to call explicitly |
 |-------|------|----------------------|
 | `cloclo:pipeline` | Full dev cycle with Codex reviews | Almost never — CLoClo detects feature requests |
 | `cloclo:wiki` | Wiki operations (init, ingest, query, lint) | `/wiki lint` for health checks, `/wiki ingest <file>` for manual sources |
 | `cloclo:bootstrap` | Project setup | Almost never — CLoClo offers setup on first session |
+| `cloclo:rollback` | Undo pipeline commits (soft or hard) | When you need to undo work from a pipeline run |
+| `cloclo:codex-review` | Review a spec, plan, or implementation | Almost never — pipeline calls it automatically |
 
 ## Coexistence with SuperPowers
 
@@ -160,9 +189,11 @@ CLoClo complements SuperPowers — it never duplicates or overrides:
 
 | | SuperPowers | CLoClo adds |
 |---|-----------|-------------|
-| **Workflow** | Brainstorming, planning, execution, verification | Codex reviews between phases |
-| **Knowledge** | Conversation memory | Persistent wiki (cross-referenced, queryable, compounding) |
+| **Workflow** | Brainstorming, planning, execution, verification | Codex reviews between phases, maturity levels (spike/dev/ship) |
+| **Knowledge** | Conversation memory | Persistent wiki (graph-traversal queries, auto-synthesis, PII protection) |
 | **Visual** | — | agent-browser verification after UI changes |
+| **Quality gates** | — | Convergence-gated critic loops, adversarial triple-perspective, AC compliance reports |
+| **Resilience** | — | Checkpoint/resume, session handoff, bounded retries, rollback |
 | **Hooks** | Skill invocation rules | Wiki state + visual verification reminders |
 
 Both SessionStart hooks run and concatenate. No conflict.
