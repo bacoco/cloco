@@ -40,15 +40,12 @@ If `codex` is NOT found:
 2. If npm fails, tell the user: "Could not install Codex CLI. Install it manually: `npm install -g @openai/codex`"
 3. After install, run: `codex --version` to confirm
 
-### Step 3: Check Codex authentication
+### Step 3: Check Codex companion (replaces old auth check)
 
-```bash
-codex whoami
-```
-
-If not authenticated:
-1. Tell the user: "Codex is not authenticated. Run `! codex login` (the `!` prefix runs it in this session)."
-2. Wait for the user to confirm login is done.
+The Codex CLI manages its own authentication (stored token). Do NOT check
+`codex whoami` (requires TTY) or `OPENAI_API_KEY` (not used by Codex CLI).
+The companion script handles auth internally — if it fails at runtime,
+the pipeline falls back to degraded mode.
 
 ### Step 4: Check Codex Claude Code plugin
 
@@ -66,10 +63,18 @@ If companion NOT found:
 
 ### Degraded Mode
 
-If Codex CLI, auth, or plugin fail but SuperPowers is available:
-- **WARNING:** "Codex reviews will be skipped. Running in SuperPowers-only mode."
-- Continue without Codex reviews (phases 2, 4, 6 are skipped).
-- The pipeline still works — you just don't get the independent Codex reviews.
+### Degraded Mode — Claude Fallback
+
+If Codex CLI, companion, or runtime fail (including usage limits):
+- **WARNING:** "Codex unavailable. Using Claude agent review as fallback."
+- Phases 2, 4, 6 still run, but use a **Claude subagent** instead of Codex.
+- The subagent is dispatched with `subagent_type: "superpowers:code-reviewer"` and receives
+  the same review brief (spec, plan, file paths, base_ref).
+- Output is written to the same session file (e.g., `02-claude-review-spec.md` instead of `02-codex-review-spec.md`).
+- Decision points A-E still apply — the user decides what to integrate.
+- This is NOT as good as Codex (same model family, less independence), but it catches
+  real bugs because the reviewer agent has fresh context and hasn't seen the conversation.
+- The pipeline NEVER skips review phases entirely. At minimum, a Claude agent reviews.
 
 ## Session Setup
 

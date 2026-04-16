@@ -44,8 +44,7 @@ Then, locate the companion script:
 CODEX_COMPANION_PATH="${CODEX_COMPANION_PATH:-$(find ~/.claude/plugins -name codex-companion.mjs -path '*/codex/scripts/*' 2>/dev/null | head -1)}"
 
 # If not found: return CODEX_UNAVAILABLE
-# Check auth: codex whoami
-# If not authenticated: return CODEX_NOT_AUTHENTICATED
+# Auth is managed by Codex CLI internally — do NOT check codex whoami or OPENAI_API_KEY
 ```
 
 If the Codex CLI is not installed, return status `CODEX_UNAVAILABLE` with the message:
