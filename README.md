@@ -1,13 +1,15 @@
-# CLoClo — Code Loop Orchestrator: Claude + Codex + CodeRabbit
+# CLoClo — Code Loop Orchestrator: Claude + Codex + GLM + CodeRabbit
 
 A Claude Code plugin that works invisibly. You code normally — CLoClo handles the rest:
 
-- **Codex reviews your specs, plans, and code** between each development phase
+- **Codex + GLM-5.1 review your specs, plans, and code in parallel** between each development phase — two independent frontier models, consensus matrix for agreement/disagreement
 - **CodeRabbit runs static analysis** on every implementation before verification
 - **A persistent wiki compounds your project knowledge** with every change you make
 - **UI changes get visual verification** automatically via agent-browser
 
-You never need to call a command. CLoClo detects what you're doing and acts — or use `/coderabbit` to run a CodeRabbit review on demand, outside the pipeline.
+You never need to call a command. CLoClo detects what you're doing and acts — or use `/coderabbit` for a standalone CodeRabbit review, or `/glm` for a standalone GLM-5.1 review.
+
+**GLM-5.1 is optional.** Set `ZAI_API_KEY`, `GLM_API_KEY`, or `LLM_API_KEY_EXCENIA` in your shell. Missing key = silent skip; Codex still reviews every phase alone. The Z.ai plan is typically open-bar for GLM, so enabling it adds a second frontier-model opinion at no per-call cost.
 
 ## Installation
 

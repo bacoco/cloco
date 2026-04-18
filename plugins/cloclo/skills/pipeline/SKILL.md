@@ -33,19 +33,20 @@ directive vocabulary: `references/smart-resume.md`.
 | # | Phase | Skill invoked | Output |
 |---|-------|---------------|--------|
 | 1 | Design | `superpowers:brainstorming` | `01-spec.md` |
-| 2 | Review spec (auto-integrate) | `codex-review` (spec) | `02-codex-review-spec.md` |
+| 2 | Review spec (Codex + GLM parallel, auto-integrate) | `codex-review` + `glm-review` (spec) | `02-codex-review-spec.md`, `02-glm-review-spec.md` |
 | 3 | Plan | `superpowers:writing-plans` | `04-plan.md` |
-| 4 | Review plan (auto-integrate) | `codex-review` (plan) | `05-codex-review-plan.md` |
+| 4 | Review plan (Codex + GLM parallel, auto-integrate) | `codex-review` + `glm-review` (plan) | `05-codex-review-plan.md`, `05-glm-review-plan.md` |
 | 4.5 | Task DAG + briefs | inline | `08-task-dag.md`, `task-briefs/` |
 | 5 | Execute | `superpowers:subagent-driven-development` | commits on feature branch |
-| 6 | Review impl arch (auto-integrate) | `codex-review` (impl) | `07-codex-review-impl.md` |
+| 6 | Review impl (Codex + GLM parallel, auto-integrate) | `codex-review` + `glm-review` (impl) | `07-codex-review-impl.md`, `07-glm-review-impl.md` |
 | 6.5 | Review impl static (opt-in when Phase 9 runs) | `coderabbit-review` | `07b-coderabbit-review-impl.md` |
 | 7 | Verify | `superpowers:verification-before-completion` | `09-compliance-report.md` |
 | 7.5 | Visual verify (if UI) | `agent-browser` | `screenshots/` |
 | 8 | Wiki ingest (auto) | inline | wiki updated |
 | 9 | Open PR + multi-bot auto-integrate + auto-merge | `superpowers:finishing-a-development-branch` | PR URL, merged, branch deleted |
+| 9.5 | Post-merge GLM review (open-bar safety net) | `glm-review` (impl) | `11-glm-post-merge-review.md` |
 
-Full per-phase execution: `references/phases.md`.
+Full per-phase execution: `references/phases.md`. GLM runs only when a Z.ai API key is available (`ZAI_API_KEY`, `GLM_API_KEY`, or `LLM_API_KEY_EXCENIA` env var; or legacy `infra/.env` lookup). Missing key = silent skip, Codex alone covers the review.
 
 ## Confidence-First Principle (applies everywhere)
 
@@ -131,7 +132,10 @@ Skipped (judgment-only or critical domain):
 Phase 9 opens a Pull Request via `superpowers:finishing-a-development-
 branch`, waits 10 min for installed bots, auto-applies their concrete
 patches under the 3 gates, re-reviews, and auto-merges with
-`--delete-branch` when clean. The user stays in the terminal.
+`--delete-branch` when clean. The user stays in the terminal. When a
+Z.ai API key is available, Phase 9.5 runs a final GLM-5.1 pass on the
+post-merge HEAD — open-bar safety net, non-blocking for P1/P2, auto-
+escalates P0.
 
 **Default bots** (no extra config once installed): CodeRabbit GitHub App
 + Gemini Code Assist. **Opt-in:** Codex Cloud, Claude Code Action. Full

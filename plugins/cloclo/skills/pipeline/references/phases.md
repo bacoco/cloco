@@ -14,14 +14,36 @@ Copy or symlink to `{session_dir}/01-spec.md`.
 
 **GATE:** Do not proceed until user explicitly approves the spec.
 
-## Phase 2: Codex Review Spec (Auto-Integrate)
+## Phase 2: Spec Review (Auto-Integrate) — Codex + GLM in parallel
 
-Invoke `codex-review` skill with:
-- `review_type`: `spec`
-- `input_file`: `{session_dir}/01-spec.md`
-- `output_file`: `{session_dir}/02-codex-review-spec.md`
+Two independent reviewers run simultaneously. Each sees the same spec, writes to its
+own output file, and the calling skill merges their findings via the consensus matrix.
 
-If Codex unavailable → skip with warning, proceed to next phase.
+**Codex (primary, GPT-5.4):**
+- Invoke `codex-review` skill with:
+  - `review_type`: `spec`
+  - `input_file`: `{session_dir}/01-spec.md`
+  - `output_file`: `{session_dir}/02-codex-review-spec.md`
+
+**GLM-5.1 (parallel, via Z.ai Anthropic-compatible endpoint):**
+- Invoke `glm-review` skill with the same parameters but:
+  - `output_file`: `{session_dir}/02-glm-review-spec.md`
+
+**Parallel dispatch pattern:**
+```bash
+(invoke codex-review ...) &  CODEX_PID=$!
+(invoke glm-review   ...) &  GLM_PID=$!
+wait $CODEX_PID; wait $GLM_PID
+```
+
+Both run in background jobs; the skill waits for both before proceeding. Typical
+total time = max(codex_time, glm_time) ≈ 3-8 minutes (limited by the slower model,
+not the sum).
+
+**Availability gates:**
+- Codex unavailable (CLI missing, usage limit) → its built-in Claude fallback runs. Never skipped silently.
+- GLM unavailable (no Z.ai key, API down) → **skipped with warning**, no fallback. Codex still produces a review, so the phase still has ≥1 opinion.
+- Both unavailable → log warning, proceed to next phase without review. This is the only case where Phase 2 actually skips entirely.
 
 **Auto-Integration (replaces old Decision Point #1):**
 
@@ -48,10 +70,17 @@ pre-written commit messages.
 **Output:** plan in `docs/superpowers/plans/YYYY-MM-DD-*.md` →
 `{session_dir}/04-plan.md`.
 
-## Phase 4: Codex Review Plan (Auto-Integrate)
+## Phase 4: Plan Review (Auto-Integrate) — Codex + GLM in parallel
 
-Invoke `codex-review` with `review_type: plan`, `input_file: 04-plan.md`,
-`output_file: 05-codex-review-plan.md`, `spec_path: <approved spec>`.
+Same parallel dispatch as Phase 2. Both reviewers see the plan, the approved spec,
+and write independent findings.
+
+- `codex-review`: `review_type: plan`, `output_file: 05-codex-review-plan.md`
+- `glm-review`:   `review_type: plan`, `output_file: 05-glm-review-plan.md`
+- Both receive `input_file: {session_dir}/04-plan.md` and `spec_path: <approved spec>`.
+
+Background-job dispatch + `wait` identical to Phase 2. GLM skip-on-missing-key
+semantics identical to Phase 2.
 
 **Auto-Integration (replaces old Decision Point #2):** same 3-gate rule
 as Phase 2 (concrete revision + factual fix + no contradictions). Apply
@@ -133,10 +162,21 @@ returns BLOCKED on Sonnet due to reasoning issue, re-dispatch with Opus.
 
 Record `base_ref` (SHA before execution) and `commit_list` (all new commits).
 
-## Phase 6: Codex Review Implementation (Auto-Integrate)
+## Phase 6: Implementation Review (Auto-Integrate) — Codex + GLM in parallel
 
-Invoke `codex-review` with `review_type: impl`, `base_ref`, `commit_list`,
-output `07-codex-review-impl.md`.
+Same parallel dispatch pattern. Both reviewers see the spec, plan, base_ref, and
+commit_list. They produce independent findings files, merged through the 3-reviewer
+consensus matrix (GLM counts as a 3rd voice alongside Codex and, if enabled, CodeRabbit
+CLI in Phase 6.5).
+
+- `codex-review`: `review_type: impl`, `output_file: 07-codex-review-impl.md`
+- `glm-review`:   `review_type: impl`, `output_file: 07-glm-review-impl.md`
+- Both receive `spec_path`, `plan_path`, `base_ref`, `commit_list`.
+
+**Consensus extensions for 2+ reviewers:**
+- 2-of-2 agreement on a file:line → `[CONSENSUS]`, severity max, apply.
+- 2-of-3 agreement (if CodeRabbit 6.5 runs too) → `[MAJORITY]`, apply.
+- 1-of-2 or 1-of-3 flag → present to the 3-gate auto-integration (same as today).
 
 **Auto-Integration (replaces old Decision Point #3):** same 3-gate rule
 as Phase 9 (concrete patch + non-critical domain + no cross-finding
@@ -481,3 +521,59 @@ Each bot catches different bugs, fixes are auto-applied with patch guardrails,
 and the permanent GitHub PR record is more valuable than session-dir files
 alone for future audits. The user stays in the terminal; no context switch
 to the GitHub UI.
+
+## Phase 9.5: Post-Merge GLM Review (Open-Bar Safety Net)
+
+Runs only when `glm-review` is available (Z.ai key present). Fires **after** the
+squash-merge of Phase 9 has landed on `main`. Catches two classes of problems the
+PR review loop can miss:
+
+1. **Squash-merge regressions.** Iteration rounds 1..N each looked good in isolation,
+   but the final squashed commit combines them in ways no intermediate diff
+   exposed.
+2. **Cross-PR drift.** Between Phase 9 opening the PR and the auto-merge landing,
+   other commits may have merged to `main`. GLM reviews the post-merge HEAD so the
+   final state gets an independent pass.
+
+### Execution
+
+```bash
+invoke glm-review with:
+  review_type: impl
+  input_file:  {session_dir}/04-plan.md     # reference plan, still valid
+  output_file: {session_dir}/11-glm-post-merge-review.md
+  spec_path:   {approved_spec}
+  plan_path:   {approved_plan}
+  base_ref:    <sha of main BEFORE the squash-merge>
+  commit_list: <squash_merge_sha>
+```
+
+### Findings handling
+
+Non-blocking by default. GLM findings on post-merge HEAD are written to
+`11-glm-post-merge-review.md` and summarized in the handoff (`handoff.md`) as:
+
+```
+## Post-merge GLM review
+- Findings: N (P0: x, P1: y, P2: z)
+- File:    {session_dir}/11-glm-post-merge-review.md
+- Action:  {automatic | user follow-up needed}
+```
+
+- 0 findings → logged, pipeline exits clean.
+- P2-only findings → logged in handoff as "nits", no action.
+- P1 findings → flagged in handoff, user decides in next session whether to fix.
+- **P0 findings → auto-escalate.** The user is alerted in the terminal with the 3-option ask (fix now / schedule follow-up / ignore with rationale).
+
+### Why this is cheap
+
+Z.ai GLM quota is open-bar for this user, so running a 4th independent model pass
+after the PR merges costs nothing and catches rare-but-real regressions that slip
+through the multi-bot PR loop. If the Z.ai key is missing, the phase is a silent
+no-op (same skip semantics as Phase 2/4/6 GLM dispatch).
+
+### Skip Conditions
+
+- No Z.ai API key available → silent skip.
+- `maturity: spike` → skip (Phase 9 itself was skipped, so there's nothing to post-review).
+- Phase 9 escalated instead of merging → skip (the PR is still open; post-merge review is N/A until merge lands).
