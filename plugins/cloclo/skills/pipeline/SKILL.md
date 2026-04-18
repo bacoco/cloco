@@ -24,7 +24,7 @@ decision points between them.
 **Do NOT use for:** single-file fixes, one-line changes, exploratory reads,
 or anything that does not need a spec.
 
-## The 9-Phase Flow
+## The 10-Phase Flow
 
 | # | Phase | Skill invoked | Output |
 |---|-------|---------------|--------|
@@ -33,14 +33,43 @@ or anything that does not need a spec.
 | 3 | Plan | `superpowers:writing-plans` | `04-plan.md` |
 | 4 | Review plan | `codex-review` (plan) | `05-codex-review-plan.md` → Decision #2 |
 | 4.5 | Task DAG + briefs | inline | `08-task-dag.md`, `task-briefs/` |
-| 5 | Execute | `superpowers:subagent-driven-development` | commits |
+| 5 | Execute | `superpowers:subagent-driven-development` | commits on feature branch |
 | 6 | Review impl (arch) | `codex-review` (impl) | `07-codex-review-impl.md` → Decision #3 |
-| 6.5 | Review impl (static) | `coderabbit-review` | `07b-coderabbit-review-impl.md` → Decision #3b |
+| 6.5 | Review impl (static, local) | `coderabbit-review` (opt-in) | `07b-coderabbit-review-impl.md` → Decision #3b |
 | 7 | Verify | `superpowers:verification-before-completion` | `09-compliance-report.md` |
 | 7.5 | Visual verify (if UI) | `agent-browser` | `screenshots/` |
 | 8 | Wiki ingest (auto) | inline | wiki updated |
+| **9** | **Open PR + multi-bot review** | `superpowers:finishing-a-development-branch` | PR URL, bot review digest |
 
 Full per-phase detail: see `references/phases.md`.
+
+**PR-first default.** Since version 0.5.0, the pipeline ends with opening a
+Pull Request (Phase 9). The PR automatically triggers any installed review
+bots (CodeRabbit GitHub App, Gemini Code Assist, Codex Cloud, Claude Code
+Action) — each providing a complementary angle. Direct-to-main is reserved
+for trivial changes outside the pipeline.
+
+**Phase 6.5 becomes opt-in when Phase 9 runs.** The CodeRabbit CLI in
+Phase 6.5 duplicates what the CodeRabbit GitHub App will do on the PR. Skip
+6.5 by default; enable it explicitly when:
+- You want to catch issues BEFORE pushing (save a PR update cycle)
+- You're on `ship` maturity (defense-in-depth)
+- The GitHub App is not installed on the repo
+
+## Multi-Bot PR Review Stack
+
+Once Phase 9 opens the PR, these bots run in parallel on the same diff:
+
+| Bot | Install | Focus | Cost |
+|-----|---------|-------|------|
+| [CodeRabbit GitHub App](https://github.com/apps/coderabbitai) | App + seat assigned | Line-level, security, style, summary | Pro ($24/dev/mo) for private |
+| [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | GitHub App | Architecture, high-level review | Free for private |
+| [Codex Cloud](https://chatgpt.com/codex) | Connect repo | Spec compliance, test coverage | ChatGPT subscription |
+| [Claude Code GitHub Action](https://github.com/anthropics/claude-code-action) | GitHub Actions | Claude review via CI | Anthropic API key |
+
+Stacking at least 2 bots is recommended — they rarely overlap, and
+disagreements are useful signal (`[DISAGREEMENT]` flag, same rule as Phase
+6 / Phase 6.5 consensus matrix).
 
 ## Session Setup
 
@@ -139,3 +168,9 @@ at end of every run for session resume. Full structure:
 11. **Reviews NEVER auto-skip.** If Codex fails → Claude fallback. If
     CodeRabbit fails → warn and continue (static analysis is a safety net, not
     a blocker).
+12. **Phase 9 always runs** unless explicitly disabled with `--no-pr` or
+    `maturity=spike`. Direct merges to main are reserved for trivial
+    out-of-pipeline fixes.
+13. **Multi-bot reviews on the PR are informational.** The pipeline does NOT
+    block on bot verdicts — the user decides merge readiness based on the
+    bot digest presented by Phase 9.

@@ -161,6 +161,25 @@ See [Model Selection Policy](plugins/cloclo/skills/pipeline/SKILL.md#model-selec
 
 After UI changes, [agent-browser](https://github.com/vrsalis/agent-browser) opens the affected pages, takes screenshots, and verifies the UI matches the spec. If agent-browser is not installed, visual verification is skipped with a warning.
 
+### PR-first workflow + multi-bot review (Phase 9)
+
+Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging to main. The PR triggers every review bot installed on the repo — each bot catches different issues, and disagreements between bots are surfaced as useful signal.
+
+**Supported bots** (install once, review every PR):
+
+| Bot | Install URL | Focus |
+|-----|-------------|-------|
+| CodeRabbit | [github.com/apps/coderabbitai](https://github.com/apps/coderabbitai) | Inline nits, security, summary |
+| Gemini Code Assist | [github.com/apps/gemini-code-assist](https://github.com/apps/gemini-code-assist) | High-level architecture |
+| Codex Cloud | [chatgpt.com/codex](https://chatgpt.com/codex) | Spec compliance, test coverage |
+| Claude Code Action | [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) | Claude review via GitHub Actions |
+
+**Recommended minimum stack**: CodeRabbit (line-level detail) + Gemini (free for private repos, different angle). Stacking at least 2 bots catches 2-3x more issues than any single bot alone.
+
+**Direct merges to main** are reserved for trivial out-of-pipeline changes (typos, config one-liners). Anything substantive goes through a PR. This is also the default in `pipeline.config.md` — override with `--no-pr` for experiments.
+
+**Phase 6.5 CodeRabbit CLI becomes opt-in** when Phase 9 runs (the GitHub App will review the PR anyway). Enable 6.5 explicitly on `ship` maturity for defense-in-depth, or when the App is not installed on the repo.
+
 ## First-time setup on a new project
 
 On the first session in a new project, CLoClo offers to set up infrastructure:
@@ -185,8 +204,11 @@ Every session after that:
     ├─► You describe what you want → full dev cycle runs (automatic)
     │     SuperPowers handles workflow
     │     Codex reviews between phases (adversarial + evidence-tagged)
-    │     CodeRabbit runs static analysis on every implementation
+    │     CodeRabbit CLI runs static analysis (opt-in when Phase 9 active)
     │     agent-browser verifies UI
+    │     Pipeline opens a PR → all installed bots review in parallel
+    │     (CodeRabbit App, Gemini, Codex Cloud, Claude Action)
+    │     User reviews bot digest → merges when ready
     │     Checkpoint saved after each phase (crash-safe)
     ├─► You commit → wiki updates (automatic, PII-protected)
     ├─► You ask questions → wiki answers with graph traversal + citations

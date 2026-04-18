@@ -199,3 +199,115 @@ Runs if `wiki/schema.md` exists. Otherwise skip silently.
    - Pages created: <list>
    - Pages updated: <list>
    ```
+
+## Phase 9: Open PR + Multi-Bot Review
+
+Since 0.5.0 the pipeline ends by opening a Pull Request. The PR triggers all
+review bots installed on the repo — each angle reinforces the others.
+
+### Step 1: Ensure feature branch
+
+Phase 5 should have produced commits on a non-main branch. If the pipeline
+was run directly on main (not recommended), create a branch now:
+
+```bash
+BRANCH="pipeline/$(basename $session_dir)"
+git checkout -b "$BRANCH"
+```
+
+### Step 2: Invoke `superpowers:finishing-a-development-branch`
+
+Invoke `Skill("superpowers:finishing-a-development-branch")`. That skill
+handles:
+- Pre-push checks (tests pass, no WIP commits, branch rebased on main)
+- Push to remote
+- PR creation with structured summary (links spec, plan, Codex/CodeRabbit
+  review files, compliance report)
+- PR URL returned to the main conversation
+
+### Step 3: Wait for bot reviews
+
+After PR opens, bots take 1-5 minutes each. Poll PR comments:
+
+```bash
+gh pr view --comments --json comments \
+  --jq '[.comments[] | select(.author.login | test("coderabbit|gemini|codex|claude"; "i"))]'
+```
+
+**Supported bots** (install once per repo/org, then auto-review every PR):
+
+| Bot | GitHub App / Action | Review style |
+|-----|---------------------|--------------|
+| CodeRabbit | github.com/apps/coderabbitai | Inline nits + summary, [CHILL/ASSERTIVE] profile |
+| Gemini Code Assist | github.com/apps/gemini-code-assist | High-level architecture comments |
+| Codex Cloud | chatgpt.com/codex (connect repo) | Spec compliance, test suggestions |
+| Claude Code Action | anthropics/claude-code-action | Config via GitHub Actions workflow |
+
+Wait until at least one bot has posted a comment OR 5 minutes have elapsed,
+whichever comes first.
+
+### Step 4: Aggregate findings
+
+Read each bot's comments. Produce a consolidated digest
+`{session_dir}/10-pr-bot-digest.md`:
+
+```markdown
+# PR #<N> — Multi-Bot Review Digest
+
+## CodeRabbit ({M findings})
+- [file:line] — severity — description
+- ...
+
+## Gemini Code Assist ({M findings})
+- ...
+
+## Codex Cloud ({M findings})
+- ...
+
+## Consensus Findings
+Items flagged by 2+ bots at the same file:line:
+- [CONSENSUS high] file:line — ...
+
+## Disagreements
+Items where bots disagree on severity:
+- [DISAGREEMENT] file:line — CodeRabbit: high | Gemini: low — ...
+```
+
+### Step 5: Decision Point #4 (Merge Readiness)
+
+```
+Les bots ont review ta PR. Voici le bilan :
+
+{N} findings total, {C} consensus, {D} disagreements
+Liens : {pr_url}, {session_dir}/10-pr-bot-digest.md
+
+Que veux-tu faire ?
+
+A. Corriger tous les findings consensus → commit + push → re-review
+B. Corriger certains findings (tu precises) → commit + push → re-review
+C. Ignorer et merge maintenant (gh pr merge --squash --delete-branch)
+D. Laisser la PR ouverte, review humaine d'abord
+E. Edit toi-meme, dis "c'est bon" quand pret
+
+Ou commentaire libre.
+```
+
+### Step 6: Merge (if user chose C)
+
+```bash
+gh pr merge --squash --delete-branch
+```
+
+Log: `[timestamp] Phase 9 complete: PR #<N> merged | {N} bot findings, {C} consensus`.
+
+### Skip Conditions
+
+- `maturity: spike` → skip Phase 9, direct commit to main allowed
+- `--no-pr` flag → skip Phase 9
+- No remote configured (offline / local-only) → skip with warning
+
+### Token Efficiency Note
+
+Phase 9 adds ~2-5 minutes to the pipeline (bot review wait). The tradeoff:
+each bot catches different bugs, and the permanent GitHub PR record is more
+valuable than session-dir files alone for future audits.
