@@ -24,7 +24,9 @@ decision points between them.
 **Do NOT use for:** single-file fixes, one-line changes, exploratory reads,
 or anything that does not need a spec.
 
-## The 10-Phase Flow
+## The Pipeline Flow
+
+Nine main phases (1–9) with sub-phases (4.5, 6.5, 7.5, 8) for diagnostic, static, visual, and knowledge passes:
 
 | # | Phase | Skill invoked | Output |
 |---|-------|---------------|--------|
