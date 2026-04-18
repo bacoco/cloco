@@ -160,17 +160,23 @@ You experience this as a natural conversation. CLoClo orchestrates the phases, i
 
 ### Smart-resume — re-entering a session mid-pipeline
 
-If a session already has a spec, plan, or commits (you started it earlier, or someone else did), the pipeline detects the existing artifacts and either skips the matching phases automatically or asks you once what to do. You never redo work you've already done.
+`/pipeline` takes **no flags**. If the session already has a spec, plan, or commits, the pipeline detects what's done and asks you ONE question in the terminal:
 
-| Mode | Behavior |
-|------|----------|
-| `/pipeline` (no flag) | Fresh run. Full 9 phases from Phase 1. |
-| `/pipeline --resume` | Detect existing artifacts. One terminal question → skip-done / redo-all / jump-to-phase. |
-| `/pipeline --skip-existing` | Auto-skip every phase whose artifact exists. No questions asked. |
-| `/pipeline --from-phase=6` | Force start at phase 6 (review+verify+PR on existing commits). |
-| `/pipeline --findings-only` | Alias for `--from-phase=6`. Useful when code is already written and you just want the review/verify/PR loop. |
-| `/pipeline --interactive-pr` | Restore the old A-E decision at Phase 9 for this run. |
-| `/pipeline --no-pr` | Skip Phase 9 entirely. |
+```
+Session "{slug}" a deja :
+  ✓ Phase 1 spec    ({path})
+  ✓ Phase 3 plan    ({path})
+  ✓ Phase 5 commits (branch {branch}, {N} commits ahead of main)
+
+Quoi faire ?
+A. Continue avec l'existant (skip ce qui est fait)          ← default
+B. Refais tout from Phase 1 (ecrase les artifacts existants)
+C. Jumpe a la phase de review (part de Phase 6)
+```
+
+You hit Enter for A (continue), or type B / C. No flags to remember.
+
+**C is the common case** when code is already written and you just want the review → verify → PR → auto-merge loop. It skips design/plan/execute, runs review + verify on current commits, opens a PR, lets bots review, auto-applies their fixes, merges, deletes the branch.
 
 After a successful auto-merge, the feature branch is deleted both locally and on the remote (`gh pr merge --squash --delete-branch --auto`). If the merge escalates instead, the branch stays alive so you can push manual fixes.
 
@@ -277,7 +283,7 @@ Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging 
 
 **What "auto-apply" means:** a bot finding is applied automatically only when (1) the bot provides a concrete diff or file:line+replacement, (2) the finding is not in auth / payments / data migration domain, and (3) no two bots propose conflicting patches on the same line. Everything else is logged and skipped. Iteration cap = 3 rounds, then escalate.
 
-**Escape hatch:** pass `--interactive-pr` for a specific run to restore the old A-E decision point and review findings manually.
+**Escape hatch:** if you want manual control, answer `B` (redo all) or `C` (jump to review) at the smart-resume prompt, or edit the session dir before re-running `/pipeline`.
 
 **Default bots** (install once, review every PR automatically):
 
@@ -295,7 +301,7 @@ Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging 
 
 **Default stack** = CodeRabbit + Gemini. Two angles, both zero-config after install, both post reviews directly on the PR. Adding Codex Cloud or Claude Code Action is an explicit opt-in per repo.
 
-**Direct merges to main** are reserved for trivial out-of-pipeline changes (typos, config one-liners). Anything substantive goes through a PR. See the Skip Conditions in [phases.md](plugins/cloclo/skills/pipeline/references/phases.md#skip-conditions) (spike maturity, `--no-pr` flag, offline) to override when needed.
+**Direct merges to main** are reserved for trivial out-of-pipeline changes (typos, config one-liners). Anything substantive goes through a PR. Phase 9 is skipped only on `maturity: spike` (prototyping) or when there's no git remote configured.
 
 **Phase 6.5 CodeRabbit CLI becomes opt-in** when Phase 9 runs (the GitHub App will review the PR anyway). Enable 6.5 explicitly on `ship` maturity for defense-in-depth, or when the App is not installed on the repo.
 

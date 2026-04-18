@@ -459,10 +459,11 @@ No GitHub visit required on the clean path.
 ### Skip Conditions
 
 - `maturity: spike` → skip Phase 9, direct commit to main allowed
-- `--no-pr` flag → skip Phase 9
 - No remote configured (offline / local-only) → skip with warning
-- `--interactive-pr` flag → restore the old A-E decision point (escape hatch
-  when the user wants manual control for a specific run)
+
+Phase 9 runs automatically in `dev` and `ship` maturity with no opt-out
+flag. If the user needs to opt out for a specific session, they set
+`maturity: spike` in `pipeline.config.md` before running.
 
 ### Token Efficiency Note
 
