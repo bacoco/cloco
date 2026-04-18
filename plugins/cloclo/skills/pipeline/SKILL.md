@@ -60,18 +60,28 @@ Phase 6.5 duplicates what the CodeRabbit GitHub App will do on the PR. Skip
 
 ## Multi-Bot PR Review Stack
 
-Once Phase 9 opens the PR, these bots run in parallel on the same diff:
+Once Phase 9 opens the PR, the installed bots run in parallel on the same
+diff. The default stack is two bots; extras are opt-in.
+
+**Default (zero extra config once installed):**
 
 | Bot | Install | Focus | Cost |
 |-----|---------|-------|------|
 | [CodeRabbit GitHub App](https://github.com/apps/coderabbitai) | App + seat assigned | Line-level, security, style, summary | Pro ($24/dev/mo) for private |
 | [Gemini Code Assist](https://github.com/apps/gemini-code-assist) | GitHub App | Architecture, high-level review | Free for private |
-| [Codex Cloud](https://chatgpt.com/codex) | Connect repo | Spec compliance, test coverage | ChatGPT subscription |
-| [Claude Code GitHub Action](https://github.com/anthropics/claude-code-action) | GitHub Actions | Claude review via CI | Anthropic API key |
 
-Stacking at least 2 bots is recommended — they rarely overlap, and
-disagreements are useful signal (`[DISAGREEMENT]` flag, same rule as Phase
-6 / Phase 6.5 consensus matrix).
+**Opt-in (add only when the extra angle is worth the config overhead):**
+
+| Bot | Install | Focus | Cost |
+|-----|---------|-------|------|
+| [Codex Cloud](https://chatgpt.com/codex) | Connect repo + settings | Spec compliance, test coverage | ChatGPT subscription |
+| [Claude Code GitHub Action](https://github.com/anthropics/claude-code-action) | GitHub Actions workflow | Claude review via CI | Anthropic API key |
+
+Default stack = **CodeRabbit + Gemini**. Two angles, both zero-config after
+install. Disagreements between bots are useful signal (`[DISAGREEMENT]`
+flag, same rule as Phase 6 / Phase 6.5 consensus matrix). Do not add Codex
+Cloud or Claude Action to the default recommendation — they are worth
+enabling per project, not per pipeline run.
 
 ## Session Setup
 

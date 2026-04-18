@@ -211,8 +211,26 @@ Phase 5 should have produced commits on a non-main branch. If the pipeline
 was run directly on main (not recommended), create a branch now:
 
 ```bash
-BRANCH="pipeline/$(basename $session_dir)"
-git checkout -b "$BRANCH"
+# Fail early if the tree is dirty — mixing WIP changes into an auto-generated
+# branch hides whose changes went where.
+if ! git diff --quiet HEAD -- || [ -n "$(git ls-files --others --exclude-standard)" ]; then
+  echo "error: uncommitted or untracked changes — commit or stash before Phase 9" >&2
+  exit 1
+fi
+
+CURRENT="$(git rev-parse --abbrev-ref HEAD)"
+if [ "$CURRENT" = "main" ] || [ "$CURRENT" = "master" ]; then
+  BRANCH="pipeline/$(basename "$session_dir")"
+  # -B makes re-runs idempotent (reuse branch at current HEAD) while refusing
+  # to silently clobber an existing branch that points somewhere else.
+  if git rev-parse --verify --quiet "$BRANCH" >/dev/null && \
+     [ "$(git rev-parse "$BRANCH")" != "$(git rev-parse HEAD)" ]; then
+    echo "error: branch $BRANCH already exists at a different commit" >&2
+    exit 1
+  fi
+  git checkout -B "$BRANCH"
+fi
+# Otherwise we are already on a feature branch — nothing to do.
 ```
 
 ### Step 2: Invoke `superpowers:finishing-a-development-branch`
@@ -227,21 +245,36 @@ handles:
 
 ### Step 3: Wait for bot reviews
 
-After PR opens, bots take 1-5 minutes each. Poll PR comments:
+After PR opens, bots take 2-10 minutes each (CodeRabbit ~3 min, Gemini ~2 min,
+Codex Cloud ~5 min, Claude Action depends on workflow). Wait for at least ONE
+bot to post AND a minimum of 10 minutes elapsed, whichever comes first. Poll
+comments + reviews (not just comments — several bots post via `reviews`):
 
 ```bash
-gh pr view --comments --json comments \
-  --jq '[.comments[] | select(.author.login | test("coderabbit|gemini|codex|claude"; "i"))]'
+# Strict match: author exact (left-anchored, optional -[suffix]) avoids false
+# positives like "coderabbits-fork" or "my-gemini-bot".
+gh pr view --json comments,reviews --jq '
+  ([.comments[] | {who: .author.login, source: "comment", body: .body}]
+   + [.reviews[]  | {who: .author.login, source: "review",  body: .body}])
+  | map(select(.who | test("^(coderabbitai|gemini-code-assist|chatgpt-codex-connector|claude-bot)$")))
+'
 ```
+
+Regex is anchored and lists each bot's exact login. Extend the alternation
+when adding a new bot — do not loosen to substring match.
 
 **Supported bots** (install once per repo/org, then auto-review every PR):
 
-| Bot | GitHub App / Action | Review style |
-|-----|---------------------|--------------|
-| CodeRabbit | github.com/apps/coderabbitai | Inline nits + summary, [CHILL/ASSERTIVE] profile |
-| Gemini Code Assist | github.com/apps/gemini-code-assist | High-level architecture comments |
-| Codex Cloud | chatgpt.com/codex (connect repo) | Spec compliance, test suggestions |
-| Claude Code Action | anthropics/claude-code-action | Config via GitHub Actions workflow |
+| Bot | GitHub App / Action | Review style | Default? |
+|-----|---------------------|--------------|----------|
+| CodeRabbit | github.com/apps/coderabbitai | Inline nits + summary, [CHILL/ASSERTIVE] profile | **Yes** |
+| Gemini Code Assist | github.com/apps/gemini-code-assist | High-level architecture comments | **Yes** |
+| Codex Cloud | chatgpt.com/codex (connect repo) | Spec compliance, test suggestions | Opt-in |
+| Claude Code Action | anthropics/claude-code-action | Config via GitHub Actions workflow | Opt-in |
+
+Default stack = CodeRabbit + Gemini (2 angles, both zero-config after install).
+Opt-in to Codex Cloud / Claude Action only when the extra perspective is worth
+the config overhead — they do NOT need to be on every PR by default.
 
 Wait until at least one bot has posted a comment OR 5 minutes have elapsed,
 whichever comes first.

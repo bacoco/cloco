@@ -165,18 +165,23 @@ After UI changes, [agent-browser](https://github.com/vrsalis/agent-browser) open
 
 Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging to main. The PR triggers every review bot installed on the repo — each bot catches different issues, and disagreements between bots are surfaced as useful signal.
 
-**Supported bots** (install once, review every PR):
+**Default bots** (install once, review every PR automatically):
 
 | Bot | Install URL | Focus |
 |-----|-------------|-------|
 | CodeRabbit | [github.com/apps/coderabbitai](https://github.com/apps/coderabbitai) | Inline nits, security, summary |
 | Gemini Code Assist | [github.com/apps/gemini-code-assist](https://github.com/apps/gemini-code-assist) | High-level architecture |
+
+**Opt-in bots** (add to the stack only when the extra angle is worth the config overhead):
+
+| Bot | Install URL | Focus |
+|-----|-------------|-------|
 | Codex Cloud | [chatgpt.com/codex](https://chatgpt.com/codex) | Spec compliance, test coverage |
 | Claude Code Action | [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) | Claude review via GitHub Actions |
 
-**Recommended minimum stack**: CodeRabbit (line-level detail) + Gemini (free for private repos, different angle). Stacking at least 2 bots catches 2-3x more issues than any single bot alone.
+**Default stack** = CodeRabbit + Gemini. Two angles, both zero-config after install, both post reviews directly on the PR. Adding Codex Cloud or Claude Code Action is an explicit opt-in per repo.
 
-**Direct merges to main** are reserved for trivial out-of-pipeline changes (typos, config one-liners). Anything substantive goes through a PR. This is also the default in `pipeline.config.md` — override with `--no-pr` for experiments.
+**Direct merges to main** are reserved for trivial out-of-pipeline changes (typos, config one-liners). Anything substantive goes through a PR. See the Skip Conditions in [phases.md](plugins/cloclo/skills/pipeline/references/phases.md#skip-conditions) (spike maturity, `--no-pr` flag, offline) to override when needed.
 
 **Phase 6.5 CodeRabbit CLI becomes opt-in** when Phase 9 runs (the GitHub App will review the PR anyway). Enable 6.5 explicitly on `ship` maturity for defense-in-depth, or when the App is not installed on the repo.
 
