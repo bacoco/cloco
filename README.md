@@ -161,9 +161,13 @@ See [Model Selection Policy](plugins/cloclo/skills/pipeline/SKILL.md#model-selec
 
 After UI changes, [agent-browser](https://github.com/vrsalis/agent-browser) opens the affected pages, takes screenshots, and verifies the UI matches the spec. If agent-browser is not installed, visual verification is skipped with a warning.
 
-### PR-first workflow + multi-bot review (Phase 9)
+### PR-first workflow + multi-bot review + auto-integration (Phase 9)
 
-Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging to main. The PR triggers every review bot installed on the repo — each bot catches different issues, and disagreements between bots are surfaced as useful signal.
+Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging to main. The PR triggers every review bot installed on the repo, then CLoClo **auto-applies** the concrete patches the bots suggest, re-reviews, and **auto-merges** when clean. You stay in the terminal — GitHub is only opened when the autonomous loop genuinely cannot resolve (iteration cap hit, patch failed, CI blocked, critical disagreement).
+
+**What "auto-apply" means:** a bot finding is applied automatically only when (1) the bot provides a concrete diff or file:line+replacement, (2) the finding is not in auth / payments / data migration domain, and (3) no two bots propose conflicting patches on the same line. Everything else is logged and skipped. Iteration cap = 3 rounds, then escalate.
+
+**Escape hatch:** pass `--interactive-pr` for a specific run to restore the old A-E decision point and review findings manually.
 
 **Default bots** (install once, review every PR automatically):
 

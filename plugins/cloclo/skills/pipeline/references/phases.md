@@ -285,16 +285,12 @@ Read each bot's comments. Produce a consolidated digest
 `{session_dir}/10-pr-bot-digest.md`:
 
 ```markdown
-# PR #<N> — Multi-Bot Review Digest
+# PR #<N> — Multi-Bot Review Digest (iteration {K})
 
 ## CodeRabbit ({M findings})
-- [file:line] — severity — description
-- ...
+- [file:line] — severity — description — patch: yes/no
 
 ## Gemini Code Assist ({M findings})
-- ...
-
-## Codex Cloud ({M findings})
 - ...
 
 ## Consensus Findings
@@ -306,41 +302,138 @@ Items where bots disagree on severity:
 - [DISAGREEMENT] file:line — CodeRabbit: high | Gemini: low — ...
 ```
 
-### Step 5: Decision Point #4 (Merge Readiness)
+### Step 5: Auto-Integration Loop (no user interaction)
 
+**The user is NEVER asked to visit GitHub during Phase 9.** Everything
+happens in the terminal: findings parsed, fixes applied, PR updated,
+re-reviewed, merged when clean.
+
+```dot
+digraph auto_integration {
+  "open PR" [shape=box];
+  "wait 10 min for bots" [shape=box];
+  "parse findings" [shape=box];
+  "any applicable fixes?" [shape=diamond];
+  "apply fixes" [shape=box];
+  "push commit" [shape=box];
+  "bots re-review" [shape=box];
+  "iteration < 3?" [shape=diamond];
+  "auto-merge" [shape=doublecircle];
+  "escalate to user" [shape=doublecircle];
+
+  "open PR" -> "wait 10 min for bots" -> "parse findings" -> "any applicable fixes?";
+  "any applicable fixes?" -> "apply fixes" [label="yes"];
+  "any applicable fixes?" -> "auto-merge" [label="no"];
+  "apply fixes" -> "push commit" -> "bots re-review" -> "iteration < 3?";
+  "iteration < 3?" -> "parse findings" [label="yes"];
+  "iteration < 3?" -> "escalate to user" [label="no — stop and report"];
+}
 ```
-Les bots ont review ta PR. Voici le bilan :
 
-{N} findings total, {C} consensus, {D} disagreements
-Liens : {pr_url}, {session_dir}/10-pr-bot-digest.md
+**An "applicable fix" must meet ALL three gates:**
 
-Que veux-tu faire ?
+1. **Concrete patch available.** The bot provided a diff block or an "AI
+   Agent prompt" with file:line and exact replacement text. Pure
+   LLM-judgment findings ("consider refactoring X") are skipped — they lack
+   the concrete patch needed for autonomous apply.
 
-A. Corriger tous les findings consensus → commit + push → re-review
-B. Corriger certains findings (tu precises) → commit + push → re-review
-C. Ignorer et merge maintenant (gh pr merge --squash --delete-branch)
-D. Laisser la PR ouverte, review humaine d'abord
-E. Edit toi-meme, dis "c'est bon" quand pret
+2. **No auth / payments / data migration domain.** Auto-apply is forbidden
+   in these critical domains even with a concrete patch. Escalate instead.
 
-Ou commentaire libre.
+3. **No conflicting patches across bots.** If CodeRabbit and Gemini propose
+   different fixes at the same file:line, skip both and log
+   `[CONFLICT — manual review needed]`.
+
+**Commit format per iteration:**
+```
+fix(pipeline): iteration {K} auto-apply ({N} fixes)
+
+Applied by Phase 9 auto-integration from bot findings on PR #<N>:
+- [CodeRabbit] file:line — description
+- [Gemini]     file:line — description
+- [CONSENSUS]  file:line — description
+
+Skipped (judgment-only or conflict):
+- file:line — reason
 ```
 
-### Step 6: Merge (if user chose C)
+**Iteration cap: 3.** After 3 iterations, exit loop even if findings
+remain. Report the final unresolved items in the handoff.
+
+### Step 6: Auto-Merge (default) or Escalation (exception)
+
+**Clean path — auto-merge:**
+
+If iteration loop exits with zero remaining `critical` or `high` findings,
+merge automatically:
 
 ```bash
-gh pr merge --squash --delete-branch
+gh pr merge --squash --delete-branch --auto
 ```
 
-Log: `[timestamp] Phase 9 complete: PR #<N> merged | {N} bot findings, {C} consensus`.
+Write to `session.log`:
+```
+[timestamp] Phase 9 auto-merged PR #<N> | {N0} findings caught, {A} auto-applied,
+{S} skipped, final: CLEAN
+```
+
+**Escalation path — only when blocked:**
+
+Escalate to the user (in the terminal, NOT on GitHub) ONLY when one of:
+
+- Iteration cap (3) hit with `critical` or `high` findings still open
+- A fix patch failed to apply (merge conflict or compile error)
+- CI / required reviewers block the merge
+- Consensus `[DISAGREEMENT]` at `critical` severity — bots disagree, can't decide
+
+Escalation message (French, per user's local IA language):
+```
+Phase 9 bloquée sur PR #<N> — la boucle auto n'a pas pu finir.
+
+Cause: {iteration_cap | fix_failed | ci_blocked | disagreement}
+Findings restants: {N} (dont {C} critical/high)
+
+Fichiers:
+- Digest: {session_dir}/10-pr-bot-digest.md
+- PR URL: {pr_url}
+
+Options:
+A. Fix manuellement en local et dis "continue" → je merge
+B. Laisse la PR ouverte, on passera plus tard
+C. Force-merge quand meme (gh pr merge --squash --admin)
+```
+
+This is the ONLY point where the user might need to touch GitHub — and
+only when the autonomous loop genuinely cannot resolve.
+
+### Step 7: Report (always)
+
+Whether auto-merged or escalated, write a terminal summary:
+
+```
+Phase 9 summary (PR #<N>):
+  Bots: {list}
+  Findings caught: {total}
+  Auto-applied: {applied_count} ({applied_details})
+  Skipped: {skipped_count} ({skipped_reasons})
+  Final state: MERGED | ESCALATED | OPEN
+  Session digest: {session_dir}/10-pr-bot-digest.md
+```
+
+No GitHub visit required on the clean path.
 
 ### Skip Conditions
 
 - `maturity: spike` → skip Phase 9, direct commit to main allowed
 - `--no-pr` flag → skip Phase 9
 - No remote configured (offline / local-only) → skip with warning
+- `--interactive-pr` flag → restore the old A-E decision point (escape hatch
+  when the user wants manual control for a specific run)
 
 ### Token Efficiency Note
 
-Phase 9 adds ~2-5 minutes to the pipeline (bot review wait). The tradeoff:
-each bot catches different bugs, and the permanent GitHub PR record is more
-valuable than session-dir files alone for future audits.
+Phase 9 adds 5-15 minutes to the pipeline (bots review + auto-apply + re-review).
+Each bot catches different bugs, fixes are auto-applied with patch guardrails,
+and the permanent GitHub PR record is more valuable than session-dir files
+alone for future audits. The user stays in the terminal; no context switch
+to the GitHub UI.

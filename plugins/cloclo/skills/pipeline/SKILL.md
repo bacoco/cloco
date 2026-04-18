@@ -183,6 +183,16 @@ at end of every run for session resume. Full structure:
 12. **Phase 9 always runs** unless explicitly disabled with `--no-pr` or
     `maturity=spike`. Direct merges to main are reserved for trivial
     out-of-pipeline fixes.
-13. **Multi-bot reviews on the PR are informational.** The pipeline does NOT
-    block on bot verdicts — the user decides merge readiness based on the
-    bot digest presented by Phase 9.
+13. **Phase 9 is fully autonomous by default.** Open PR → wait for bots →
+    auto-apply concrete fixes → re-review → auto-merge when clean. The user
+    stays in the terminal and is only escalated to on a genuine blocker
+    (iteration cap hit with open criticals, patch failed, CI blocked,
+    consensus disagreement on P0). Pass `--interactive-pr` to restore the
+    A-E decision point as an escape hatch for a specific run.
+14. **Auto-apply has hard guardrails.** A finding is auto-fixed only when
+    (a) a concrete patch / AI-Agent prompt is provided, (b) it is not in
+    auth / payments / data migration domain, and (c) no conflicting patch
+    exists at the same file:line. Everything else is skipped and logged.
+15. **Iteration cap = 3.** After 3 auto-integration rounds, the loop exits
+    regardless of remaining findings. Unresolved items land in the
+    `handoff.md` + escalation message.
