@@ -106,11 +106,22 @@ rm -f "$PROMPT_FILE"
 - `ANTHROPIC_DEFAULT_OPUS_MODEL` forces the model ID to `glm-5.1` regardless of which Claude alias the CLI requests internally. Setting `SONNET_MODEL` too catches the case where the CLI upgrades/downgrades model aliases mid-session.
 - **Only the child process inherits these vars.** The parent Claude Code session (the one running cloclo) keeps its real Anthropic auth untouched. Codex CLI, CodeRabbit CLI, and any other tooling are unaffected.
 
-### Result Check
+### Result Check (strict — mandatory post-run guard)
 
-If `output_file` exists and is non-empty AND `GLM_EXIT == 0` → **GLM succeeded**. Return raw content.
+After `claude -p` exits, run this check explicitly:
 
-If GLM failed (non-zero exit, output empty, HTTP error in stderr) → log the failure and return empty. The calling skill sees the empty file and proceeds without GLM input for this phase. **No fallback to another model** — Codex is already running in parallel and provides the independent voice.
+```bash
+if [ $GLM_EXIT -eq 0 ] && [ -s "$output_file" ]; then
+  echo "[glm-review] OK: $output_file"
+else
+  echo "[glm-review] FAIL: exit=$GLM_EXIT, file empty or missing. Skipping GLM for this phase." >&2
+  # no fallback — Codex is already running in parallel
+fi
+```
+
+**Why this is a dedicated guard** : GLM writes to stdout (redirected by the caller), so an empty file means GLM returned nothing or the HTTP call failed mid-stream. The prompt template's "RAPPEL FINAL AVANT DE CONCLURE" block is supposed to prevent empty responses, but network issues or quota hiccups can still produce a zero-byte file. The `[ -s "$output_file" ]` check catches that cleanly.
+
+**No fallback to another model** — Codex is already running in parallel and provides the independent voice.
 
 Log to `session.log`:
 ```
