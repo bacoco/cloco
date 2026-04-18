@@ -1,11 +1,11 @@
 **OBJECTIF FINAL — lis en PREMIER, relis en DERNIER** :
 
-Ta mission se termine SEULEMENT quand {{OUTPUT_PATH}} contient ta review en markdown. Deux modes selon ton tooling :
+Tu DOIS ecrire ta review complete au format markdown dans le fichier :
+{{OUTPUT_PATH}}
 
-- **Si tu as un file-write tool (Codex)** : APPELLE-LE avec le contenu complet de la review AVANT de conclure. Ne termine jamais avec "j'ai fini l'analyse" sans avoir ecrit le fichier.
-- **Si tu n'as pas de file-write tool (GLM / `claude -p`)** : emets la review complete en markdown comme reponse finale — le stdout sera redirige vers {{OUTPUT_PATH}} par l'appelant.
+Utilise ton tool d'ecriture fichier (Write pour Claude, file-write pour Codex). Ne termine JAMAIS avec "j'ai fini l'analyse" sans avoir ecrit ce fichier.
 
-Un fichier {{OUTPUT_PATH}} vide ou manquant = echec total du review, peu importe la qualite de ton analyse interne.
+Un fichier {{OUTPUT_PATH}} vide ou manquant = echec total du review, peu importe la qualite de ton analyse interne. Le markdown qui reste dans ta reponse sans ecriture fichier est perdu — le caller lit UNIQUEMENT {{OUTPUT_PATH}}.
 
 ---
 
@@ -24,6 +24,6 @@ Format libre. Prends le temps qu'il faut.
 ---
 
 **RAPPEL FINAL AVANT DE CONCLURE** :
-- Si tu as un write tool et que {{OUTPUT_PATH}} n'est pas encore ecrit : APPELLE-LE MAINTENANT.
-- Si ta derniere action etait une exploration (read, grep, diff) : emets MAINTENANT le markdown de review en reponse — sinon il sera perdu.
-- Ton analyse interne ne sert a rien si elle ne sort pas sous la forme attendue.
+- Le fichier {{OUTPUT_PATH}} doit exister et etre non-vide.
+- Si tu ne l'as pas encore ecrit : appelle ton write tool MAINTENANT avec le contenu complet de la review.
+- Ne te contente pas d'emettre le markdown en reponse — seule l'ecriture fichier compte.

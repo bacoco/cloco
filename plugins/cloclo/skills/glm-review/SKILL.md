@@ -82,22 +82,31 @@ model divergence, which is what makes the dual-review useful.
 
 ## 4. Execution (FOREGROUND)
 
+**Pattern**: GLM writes the review file itself via the Write tool (symmetric with
+Codex). No stdout redirect. The prompt template sets `{{OUTPUT_PATH}}` — the
+`acceptEdits` permission mode lets `claude -p` call Write without prompting.
+
 ```bash
 TS=$(date +%s)
 PROMPT_FILE="/tmp/cloclo-glm-prompt-${TS}.md"
 # ... resolved template written to PROMPT_FILE above ...
 
-echo "GLM-5.1 is reviewing... (this takes 2-8 minutes)"
+echo "GLM-5.1 is reviewing... (this takes 2-8 minutes). Output: $output_file"
 
 ANTHROPIC_BASE_URL="https://api.z.ai/api/anthropic" \
 ANTHROPIC_AUTH_TOKEN="$GLM_KEY" \
 ANTHROPIC_DEFAULT_OPUS_MODEL="glm-5.1" \
 ANTHROPIC_DEFAULT_SONNET_MODEL="glm-5.1" \
-claude -p "$(cat "$PROMPT_FILE")" > "$output_file"
+claude -p --permission-mode acceptEdits "$(cat "$PROMPT_FILE")"
 GLM_EXIT=$?
 
 rm -f "$PROMPT_FILE"
 ```
+
+**No `> "$output_file"` redirect.** GLM calls Write tool itself, targeting
+`{{OUTPUT_PATH}}` resolved inside the prompt. This matches Codex's behavior
+(via `codex task --write`) and gives the caller a single file contract: "read
+the output_file after the call" — regardless of which reviewer produced it.
 
 ### Why the env var pattern works
 
@@ -119,7 +128,7 @@ else
 fi
 ```
 
-**Why this is a dedicated guard** : GLM writes to stdout (redirected by the caller), so an empty file means GLM returned nothing or the HTTP call failed mid-stream. The prompt template's "RAPPEL FINAL AVANT DE CONCLURE" block is supposed to prevent empty responses, but network issues or quota hiccups can still produce a zero-byte file. The `[ -s "$output_file" ]` check catches that cleanly.
+**Why this is a dedicated guard** : GLM must call the Write tool on `{{OUTPUT_PATH}}` itself — the prompt template's "OBJECTIF FINAL" block demands it, and the `--permission-mode acceptEdits` flag lets the call succeed without prompting. If the file is still empty or missing after exit, either the model skipped the Write tool despite the prompt (rare but possible) or an HTTP/quota error aborted mid-session. The `[ -s "$output_file" ]` check catches both cleanly.
 
 **No fallback to another model** — Codex is already running in parallel and provides the independent voice.
 
@@ -130,14 +139,22 @@ Log to `session.log`:
 
 ## 5. Running in Parallel with codex-review
 
-The pipeline dispatches both reviewers as background jobs and waits for both:
+The pipeline dispatches both reviewers as background jobs and waits for both.
+Each reviewer writes its review to its own `output_file` via its Write tool
+(Codex → `codex task --write`, GLM → `claude -p` with `acceptEdits`). The
+pipeline reads those files after both jobs complete — it never parses stdout.
 
 ```bash
 # In the pipeline's Phase 2/4/6 orchestration:
-(invoke codex-review ... > "$session_dir/0X-codex-review-XXX.md" 2>&1) &
+CODEX_OUT="$session_dir/0X-codex-review-XXX.md"
+GLM_OUT="$session_dir/0X-glm-review-XXX.md"
+
+# stdout/stderr go to *.runtime.log for debugging only; the review itself is
+# written to $CODEX_OUT / $GLM_OUT by the tools.
+(invoke codex-review output_file=$CODEX_OUT ... > "$session_dir/0X-codex.runtime.log" 2>&1) &
 CODEX_PID=$!
 
-(invoke glm-review ... > "$session_dir/0X-glm-review-XXX.md" 2>&1) &
+(invoke glm-review output_file=$GLM_OUT ... > "$session_dir/0X-glm.runtime.log" 2>&1) &
 GLM_PID=$!
 
 wait $CODEX_PID
@@ -145,11 +162,13 @@ CODEX_RC=$?
 wait $GLM_PID
 GLM_RC=$?
 
-echo "Reviews complete: codex=$CODEX_RC, glm=$GLM_RC"
+echo "Reviews complete: codex=$CODEX_RC ($CODEX_OUT), glm=$GLM_RC ($GLM_OUT)"
 ```
 
-The calling skill then reads both files and merges findings through the consensus
-matrix (see `codex-review` §8, extended to 3 reviewers when CodeRabbit also runs).
+The calling skill then reads `$CODEX_OUT` and `$GLM_OUT` and merges findings
+through the consensus matrix (see `codex-review` §8, extended to 3 reviewers
+when CodeRabbit also runs). **Single file contract: whoever reviewed, the
+review is at `output_file`.**
 
 ## 6. Findings Format
 
