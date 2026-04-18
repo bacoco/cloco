@@ -64,6 +64,140 @@ SuperPowers verifies ──► evidence (commands run, output shown)
 
 You experience this as a natural conversation. CLoClo orchestrates the phases, inserts Codex reviews at the right moments, and feeds everything into the wiki — without you ever typing a command.
 
+### The full pipeline — 9 phases end-to-end
+
+```
+┌─────────────────────────────────────────────────────────────────────────┐
+│                              /pipeline                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+  PHASE 1  ► Design                          superpowers:brainstorming
+           │  One question at a time, HTML mockups, A/B/C options,
+           │  spec self-review, user approval gate
+           ▼
+           Artifact: 01-spec.md
+           │
+  PHASE 2  ► Codex Review (spec)             codex-review (spec)
+           │  Independent model reads spec, catches ambiguity,
+           │  missing edge cases, infeasibility
+           ▼
+           Artifact: 02-codex-review-spec.md → Decision #1 (A-E)
+           │
+  PHASE 3  ► Plan                            superpowers:writing-plans
+           │  Bite-sized tasks, TDD cycle, complete code blocks,
+           │  pre-written commit messages
+           ▼
+           Artifact: 04-plan.md
+           │
+  PHASE 4  ► Codex Review (plan)             codex-review (plan)
+           │  Verifies plan covers the spec, no circular deps,
+           │  code snippets compile against real types
+           ▼
+           Artifact: 05-codex-review-plan.md → Decision #2 (A-E)
+           │
+  PHASE 4.5 ► Task DAG + Briefs              inline
+           │  Dependency graph, file ownership matrix,
+           │  wave dispatch for parallel tasks
+           ▼
+           Artifacts: 08-task-dag.md, task-briefs/
+           │
+  PHASE 5  ► Execute                         superpowers:subagent-driven-development
+           │  Fresh subagent per task, two-stage review
+           │  (spec compliance → code quality), bounded retries
+           ▼
+           Output: commits on feature branch
+           │
+  PHASE 6  ► Codex Review (impl)             codex-review (impl)
+           │  Reads the diff, verifies impl matches spec,
+           │  adversarial triple-perspective pass
+           ▼
+           Artifact: 07-codex-review-impl.md → Decision #3 (A-E)
+           │
+  PHASE 6.5 ► CodeRabbit CLI (opt-in)        coderabbit-review
+           │  Local static analysis before push.
+           │  Skipped by default when Phase 9 runs
+           │  (the App reviews on the PR anyway).
+           ▼
+           Artifact: 07b-coderabbit-review-impl.md → Decision #3b
+           │
+  PHASE 7  ► Verify                          superpowers:verification-before-completion
+           │  Iron Law: NO completion claim without fresh evidence.
+           │  AC-level compliance report: every criterion mapped to test.
+           ▼
+           Artifact: 09-compliance-report.md
+           │
+  PHASE 7.5 ► Visual Verify (if UI)          agent-browser
+           │  Open each affected page, take screenshot,
+           │  read + verify every screenshot immediately
+           ▼
+           Artifacts: screenshots/*.png
+           │
+  PHASE 8  ► Wiki Ingest (auto)              inline
+           │  Session summary, new entity/concept pages,
+           │  architecture decisions, patterns + fixes
+           ▼
+           Artifact: wiki/sources/... + log entry
+           │
+  PHASE 9  ► Open PR + Multi-Bot Auto-Integrate  superpowers:finishing-a-development-branch
+           │  Open PR → wait 10 min → parse bot findings →
+           │  auto-apply concrete patches (3 gates) →
+           │  push → re-review → loop max 3× →
+           │  auto-merge when clean. User stays in terminal.
+           │  Escalation ONLY on: cap hit with criticals,
+           │  patch failed, CI blocked, P0 disagreement.
+           ▼
+           Artifact: 10-pr-bot-digest.md + merged PR
+```
+
+**Only Phase 1 (brainstorming) requires your input** — that's where design intent lives. Every review phase (2, 4, 6, 6.5, 9) auto-integrates findings under three guardrails and only escalates on genuine blockers. You stay in the terminal from spec approval to merged PR.
+
+**The three auto-apply gates** (identical for spec edits, plan edits, code fixes, and PR bot findings):
+1. Reviewer provides a concrete revision or patch — not just "consider X"
+2. Not a design pivot (approach A vs B on spec) and not in auth/payments/data-migration
+3. No contradictions between reviewers or findings at the same location
+
+**Escalation** happens in the terminal only, never on GitHub. Triggers: design pivot, critical-domain touch, cross-reviewer conflict, iteration cap hit, or patch apply failed. Answer one question and the loop resumes.
+
+**Confidence-first principle** applies everywhere, not just at scheduled escalation points. If the pipeline's confidence on any decision drops below 95% — ambiguous directive, reviewer finding touching out-of-scope code, test failure that could be regression or flake, CI red that could be infra — it asks you with 2-3 concrete options (recommended one marked). Autonomous means applying clear things under gates, not guessing on unclear ones. Free-form text responses are always accepted.
+
+### Smart-resume — re-entering a session mid-pipeline
+
+`/pipeline` takes **no flags**. Two ways to resume:
+
+**1. Dialogue (default when you invoke bare):** the pipeline detects what's done and asks one terminal question.
+
+```
+Session "{slug}" a deja :
+  ✓ Phase 1 spec    ({path})
+  ✓ Phase 3 plan    ({path})
+  ✓ Phase 5 commits (branch {branch}, {N} commits ahead of main)
+
+Quoi faire ?
+A. Continue avec l'existant (skip ce qui est fait)          ← default
+B. Refais tout from Phase 1 (ecrase les artifacts existants)
+C. Jumpe a la phase de review (part de Phase 6)
+```
+
+Hit Enter for A, or type B / C.
+
+**2. Natural-language directive (write what you want after the command):** skip the dialogue by telling the pipeline directly.
+
+```
+/pipeline passe au plan                # skip Phases 1+2, start at Phase 3
+/pipeline le code est ecrit, revois    # start at Phase 6 (review+merge)
+/pipeline refais tout                  # wipe artifacts, fresh run
+/pipeline pas de codex                 # skip Phases 2+4+6 (Codex reviews)
+/pipeline pas de PR                    # skip Phase 9
+/pipeline ship mode                    # maturity=ship (hard gates, adversarial)
+/pipeline passe au plan, pas de codex  # compositional: combine multiple
+```
+
+The pipeline interprets French, English, or mixed phrasing. If it's 80% clear, it acts. If truly ambiguous, one clarifying question, then go.
+
+**C is the common case** when code is already written and you just want the review → verify → PR → auto-merge loop. It skips design/plan/execute, runs review + verify on current commits, opens a PR, lets bots review, auto-applies their fixes, merges, deletes the branch.
+
+After a successful auto-merge, the feature branch is deleted both locally and on the remote (`gh pr merge --squash --delete-branch --auto`). If the merge escalates instead, the branch stays alive so you can push manual fixes.
+
 ### You commit code
 
 CLoClo notices. If the change was significant, it silently updates wiki pages — new components get entity pages, architecture decisions become concept pages, patterns get documented.
@@ -161,6 +295,34 @@ See [Model Selection Policy](plugins/cloclo/skills/pipeline/SKILL.md#model-selec
 
 After UI changes, [agent-browser](https://github.com/vrsalis/agent-browser) opens the affected pages, takes screenshots, and verifies the UI matches the spec. If agent-browser is not installed, visual verification is skipped with a warning.
 
+### PR-first workflow + multi-bot review + auto-integration (Phase 9)
+
+Since 0.5.0, the pipeline ends by opening a **Pull Request** instead of merging to main. The PR triggers every review bot installed on the repo, then CLoClo **auto-applies** the concrete patches the bots suggest, re-reviews, and **auto-merges** when clean. You stay in the terminal — GitHub is only opened when the autonomous loop genuinely cannot resolve (iteration cap hit, patch failed, CI blocked, critical disagreement).
+
+**What "auto-apply" means:** a bot finding is applied automatically only when (1) the bot provides a concrete diff or file:line+replacement, (2) the finding is not in auth / payments / data migration domain, and (3) no two bots propose conflicting patches on the same line. Everything else is logged and skipped. Iteration cap = 3 rounds, then escalate.
+
+**Escape hatch:** if you want manual control, answer `B` (redo all) or `C` (jump to review) at the smart-resume prompt, or edit the session dir before re-running `/pipeline`.
+
+**Default bots** (install once, review every PR automatically):
+
+| Bot | Install URL | Focus |
+|-----|-------------|-------|
+| CodeRabbit | [github.com/apps/coderabbitai](https://github.com/apps/coderabbitai) | Inline nits, security, summary |
+| Gemini Code Assist | [github.com/apps/gemini-code-assist](https://github.com/apps/gemini-code-assist) | High-level architecture |
+
+**Opt-in bots** (add to the stack only when the extra angle is worth the config overhead):
+
+| Bot | Install URL | Focus |
+|-----|-------------|-------|
+| Codex Cloud | [chatgpt.com/codex](https://chatgpt.com/codex) | Spec compliance, test coverage |
+| Claude Code Action | [anthropics/claude-code-action](https://github.com/anthropics/claude-code-action) | Claude review via GitHub Actions |
+
+**Default stack** = CodeRabbit + Gemini. Two angles, both zero-config after install, both post reviews directly on the PR. Adding Codex Cloud or Claude Code Action is an explicit opt-in per repo.
+
+**Direct merges to main** are reserved for trivial out-of-pipeline changes (typos, config one-liners). Anything substantive goes through a PR. Phase 9 is skipped only on `maturity: spike` (prototyping) or when there's no git remote configured.
+
+**Phase 6.5 CodeRabbit CLI becomes opt-in** when Phase 9 runs (the GitHub App will review the PR anyway). Enable 6.5 explicitly on `ship` maturity for defense-in-depth, or when the App is not installed on the repo.
+
 ## First-time setup on a new project
 
 On the first session in a new project, CLoClo offers to set up infrastructure:
@@ -185,8 +347,11 @@ Every session after that:
     ├─► You describe what you want → full dev cycle runs (automatic)
     │     SuperPowers handles workflow
     │     Codex reviews between phases (adversarial + evidence-tagged)
-    │     CodeRabbit runs static analysis on every implementation
+    │     CodeRabbit CLI runs static analysis (opt-in when Phase 9 active)
     │     agent-browser verifies UI
+    │     Pipeline opens a PR → all installed bots review in parallel
+    │     (CodeRabbit App, Gemini, Codex Cloud, Claude Action)
+    │     User reviews bot digest → merges when ready
     │     Checkpoint saved after each phase (crash-safe)
     ├─► You commit → wiki updates (automatic, PII-protected)
     ├─► You ask questions → wiki answers with graph traversal + citations
