@@ -54,10 +54,19 @@ rm -f "$output_file"
 
 # Keep stderr for diagnosability (auth expired, quota, network) — route it to a
 # sibling runtime log instead of /dev/null. Only $output_file is the review.
+#
+# `< /dev/null` is MANDATORY: when the calling shell is non-interactive (e.g.,
+# a Claude Code background subshell, a CI job, or a subprocess with an inherited
+# pipe), codex-cli reads stdin waiting for additional prompt fragments and hangs
+# forever on the "Reading additional input from stdin..." line. Explicitly
+# closing stdin forces codex to start as soon as it has the positional prompt.
+# This is non-deterministic without the redirect — fails ~2/3 of background
+# invocations, works in interactive terminals because the TTY signals EOF.
 codex exec \
   -s read-only \
   -o "$output_file" \
   "$(cat "$PROMPT_FILE")" \
+  < /dev/null \
   > "${output_file}.runtime.log" 2>&1
 CODEX_EXIT=$?
 
@@ -69,7 +78,8 @@ rm -f "$PROMPT_FILE"
 - `codex exec` — non-interactive one-shot session. Same tools, same working-directory rooting as an interactive `codex` run.
 - `-s read-only` — **OS-level sandbox**. Codex has FULL READ access to the entire repo (every source file, git history, CLAUDE.md, everything). Writes are blocked at the kernel level — Codex physically cannot modify any file in the project, even if the prompt told it to. Belt + suspenders with the prompt template's "don't modify code" instruction.
 - `-o "$output_file"` — the final agent message is captured directly into the review file. No stdout pollution, no tool call needed; Codex's native output flag handles it.
-- `> /dev/null 2>&1` — stdout and stderr discarded. Only `$output_file` matters.
+- `< /dev/null` — closes stdin explicitly. Without it, codex-cli hangs ~2/3 of background invocations because it treats an inherited pipe as "more input might be coming" and waits for EOF that never arrives. The positional prompt is enough on its own; stdin should always be closed in non-interactive runs.
+- `> "${output_file}.runtime.log" 2>&1` — stdout + stderr go to a sibling log (not the review file). `$output_file` is reserved for the agent's captured markdown.
 - Block until exit. Delete temp prompt after.
 
 ### Why this approach over `codex-companion.mjs task --write`
